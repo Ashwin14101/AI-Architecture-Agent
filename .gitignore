@@ -23,3 +23,6 @@ dist/
 
 # OS Temp Files
 .DS_Store
+
+# Ignore Resources folder
+Resources/
