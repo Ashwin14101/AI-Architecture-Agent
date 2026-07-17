@@ -1,0 +1,28 @@
+# Python Virtual Environments
+.venv/
+agents/venv/
+backend/venv/
+
+# Environment configs (Credentials/secrets)
+.env
+.env.*
+agents/.env
+
+# Databases
+*.db
+*.sqlite3
+
+# Python Caches
+__pycache__/
+*.py[cod]
+
+# Node/React dependencies (for later)
+node_modules/
+dist/
+.next/
+
+# OS Temp Files
+.DS_Store
+
+# Ignore Resources folder
+Resources/
