@@ -1,0 +1,289 @@
+/* ══════════════════════════════════════════════
+   ApiEndpointNode — Minimal Whimsical-style
+   ══════════════════════════════════════════════ */
+
+.api-endpoint-node {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+  padding: 8px 12px;
+  width: 220px;
+  font-family: 'Inter', -apple-system, sans-serif;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  cursor: grab;
+}
+
+.api-endpoint-node:hover {
+  box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+  border-color: #c4b5fd;
+}
+
+.api-selected {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2) !important;
+}
+
+/* ── Single row: badge + path ── */
+.api-endpoint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.method-badge {
+  font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.method-get    { background: #dbeafe; color: #1d4ed8; }
+.method-post   { background: #dcfce7; color: #15803d; }
+.method-put    { background: #fef3c7; color: #b45309; }
+.method-delete { background: #fee2e2; color: #dc2626; }
+.method-patch  { background: #f3e8ff; color: #7e22ce; }
+
+.endpoint-path {
+  font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpoint-path-input {
+  font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: #334155;
+  background: #f1f5f9;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 1px 4px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Hide description — keep it clean */
+.endpoint-desc { display: none; }
+
+/* ── Group / Branch root node ── */
+.api-group-node {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  min-width: 80px;
+  transition: all 0.15s ease;
+  cursor: grab;
+}
+
+.api-group-node:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.42);
+}
+
+.api-group-title {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+
+.api-group-title-input {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  color: #0f172a;
+  background: white;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 1px 4px;
+  width: 110px;
+  box-sizing: border-box;
+  outline: none;
+  text-align: center;
+}
+
+/* ── Handles ── */
+.api-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: #8b5cf6 !important;
+  border: 2px solid white !important;
+  border-radius: 50% !important;
+  box-shadow: 0 0 0 2px rgba(139,92,246,0.25) !important;
+  transform: translateY(-50%) !important;
+  transition: transform 0.15s;
+}
+
+.api-handle:hover { transform: translateY(-50%) scale(1.3) !important; }
+
+/* ── Edit Popover ── */
+.api-edit-popover {
+  position: absolute;
+  bottom: calc(100% + 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.13);
+  width: 270px;
+  z-index: 1000;
+  padding: 14px;
+  font-family: 'Inter', sans-serif;
+  animation: api-pop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes api-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.popover-header span {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.popover-header button {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.popover-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.popover-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.popover-field label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.popover-field input,
+.popover-field textarea,
+.popover-field select,
+.popover-select {
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #0f172a;
+  outline: none;
+  font-family: inherit;
+  background: #f8fafc;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.15s;
+}
+
+.popover-field input:focus,
+.popover-field textarea:focus,
+.popover-field select:focus,
+.popover-select:focus {
+  border-color: #3b82f6;
+  background: white;
+}
+
+.popover-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.popover-save-btn {
+  background: #0f172a;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  padding: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s;
+  font-family: inherit;
+  margin-top: 2px;
+}
+
+.popover-save-btn:hover {
+  background: #1e293b;
+}
+
+
+/* ── Floating toolbar (shared style) ── */
+.whimsical-node-toolbar {
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 3px 5px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+  z-index: 999;
+}
+
+.wtb-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: all 0.13s;
+}
+
+.wtb-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+.wtb-btn.sparkles-btn { color: #a78bfa; }
+.wtb-btn.sparkles-btn:hover { background: rgba(139,92,246,0.2); }
+.wtb-btn.delete-btn:hover { background: rgba(239,68,68,0.18); color: #f87171; }
+.wtb-sep { width: 1px; height: 14px; background: rgba(255,255,255,0.12); margin: 0 3px; }

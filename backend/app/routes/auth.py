@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 
@@ -12,7 +12,12 @@ from app.config import settings
 from app.middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -26,7 +31,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="User already exists")
     
-    hashed_password = pwd_context.hash(user_data.password)
+    hashed_password = hash_password(user_data.password)
     new_user = User(
         username=user_data.username,
         email=user_data.email,
@@ -41,7 +46,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).filter(User.email == login_data.email))
     user = result.scalars().first()
-    if not user or not pwd_context.verify(login_data.password, user.passwordHash):
+    if not user or not verify_password(login_data.password, user.passwordHash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     access_token = create_access_token(data={"id": user.id, "role": user.role})

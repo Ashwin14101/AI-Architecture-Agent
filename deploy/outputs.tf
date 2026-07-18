@@ -1,22 +1,13 @@
 
-         output 'load_balancer_url' {
-           value = aws_lb.main.dns_name
-           description = 'The URL of the load balancer'
+         output "ecs_instance_id" {
+            value = aws_ecs_service.comp_001.id
          }
 
-         output 'database_endpoint' {
-           value = aws_db_instance.main.endpoint
-           description = 'The endpoint of the RDS instance'
+         output "rds_instance_endpoint" {
+            value = aws_db_instance.comp_003.endpoint
          }
 
-         output 'database_username' {
-           value = aws_db_instance.main.username
-           description = 'The username of the RDS instance'
-         }
-
-         output 'database_password' {
-           value = aws_db_instance.main.password
-           description = 'The password of the RDS instance'
-           sensitive = true
+         output "alb_dns_name" {
+            value = aws_alb.comp_004.dns_name
          }
       

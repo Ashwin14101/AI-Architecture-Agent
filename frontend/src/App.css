@@ -1,0 +1,47 @@
+.app-shell {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Authentication Loading Screen */
+.auth-loading-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--canvas-bg);
+}
+
+.loading-capsule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-full);
+  padding: 10px 24px;
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.loading-dot-pulse {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-purple);
+  border-radius: var(--radius-full);
+  animation: pulse-glow 1.5s infinite;
+}
+
+.app-main-content {
+  position: absolute;
+  top: 78px; /* navbar 56px + 10px top + 12px gap */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}

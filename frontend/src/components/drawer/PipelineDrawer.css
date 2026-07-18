@@ -1,0 +1,259 @@
+/* ══════════════════════════════════════════════
+   PipelineDrawer — Floating Log Console
+   ══════════════════════════════════════════════ */
+
+.drawer-wrapper {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 320px;
+  z-index: 150;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+/* Toggle header */
+.drawer-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #e2e8f0;
+  transition: background 0.15s;
+}
+
+.drawer-toggle:hover { background: rgba(255, 255, 255, 0.04); }
+
+.drawer-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-toggle-label {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: -0.1px;
+}
+
+.drawer-running-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #fb923c;
+  padding: 2px 9px;
+  background: rgba(251, 146, 60, 0.12);
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  border-radius: 999px;
+}
+
+.running-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fb923c;
+  animation: pulse-glow 1.5s infinite;
+}
+
+.drawer-quality-score {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.drawer-quality-score strong { color: #4ade80; }
+
+/* ── Drawer Body ──────────────────────────────── */
+.drawer-content {
+  padding: 0 14px 14px;
+  animation: fade-in 0.15s ease;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* Progress row */
+.drawer-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0 10px;
+}
+
+.run-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #10b981;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.run-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+.run-btn:active {
+  transform: translateY(0);
+}
+
+.run-btn.stopping {
+  background: #ef4444;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+}
+
+.run-btn.stopping:hover {
+  background: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+}
+
+
+.progress-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.45s ease;
+  background: #8b5cf6;
+}
+
+.progress-bar-fill.running {
+  background: linear-gradient(90deg, #f59e0b, #fb923c);
+  animation: pulse-glow 1.5s infinite;
+}
+
+.progress-bar-fill.completed { background: #22c55e; }
+.progress-bar-fill.failed    { background: #ef4444; }
+
+.progress-label {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* ── Log Console ──────────────────────────────── */
+.log-console {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.log-console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.log-console-title {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.log-actions { display: flex; gap: 4px; }
+
+.log-action-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #475569;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.log-action-btn:hover { color: #94a3b8; background: rgba(255, 255, 255, 0.07); }
+
+.log-console-body {
+  padding: 7px 10px;
+  max-height: 100px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.65;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-empty {
+  color: #334155;
+  font-style: italic;
+  font-family: var(--font-sans);
+}
+
+.log-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.log-time {
+  color: #334155;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.log-level {
+  width: 42px;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.log-entry.level-info    .log-level { color: #60a5fa; }
+.log-entry.level-warn    .log-level { color: #fbbf24; }
+.log-entry.level-error   .log-level { color: #f87171; }
+.log-entry.level-success .log-level { color: #4ade80; }
+
+.log-msg {
+  color: #94a3b8;
+  word-break: break-word;
+  flex: 1;
+}
