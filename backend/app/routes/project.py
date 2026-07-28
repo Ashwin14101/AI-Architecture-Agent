@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import Project, Deployment, User, Document, ArchitectureVersion, Review, ReviewFinding, Requirement
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectsListResponse, DeploymentCreate, FindingUpdate
 from app.middleware.auth_middleware import get_current_user
+from app.middleware.rbac_middleware import require_role
 from app.websocket import manager
 from app.config import settings
 
@@ -67,7 +68,7 @@ async def update_project(id: str, project_update: ProjectUpdate, current_user: U
     return project
 
 @router.delete("/{id}", status_code=204)
-async def delete_project(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def delete_project(id: str, current_user: User = Depends(require_role("admin")), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
     project = result.scalars().first()
     if not project:
@@ -110,6 +111,25 @@ async def upload_document(id: str, file: UploadFile = File(...), current_user: U
         "fileSize": new_doc.fileSize,
         "message": "Document uploaded and parsed successfully!"
     }
+
+@router.get("/{id}/documents")
+async def get_project_documents(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    # Verify project ownership
+    result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    docs_result = await db.execute(select(Document).filter(Document.projectId == id).order_by(Document.createdAt.desc()))
+    docs = docs_result.scalars().all()
+    
+    return [{
+        "id": d.id,
+        "name": d.name,
+        "fileSize": d.fileSize,
+        "createdAt": d.createdAt
+    } for d in docs]
+
 
 
 # --- RETRIEVE AGENT OUTPUTS ---
@@ -217,6 +237,32 @@ async def get_all_versions(id: str, current_user: User = Depends(get_current_use
         "createdAt": v.createdAt
     } for v in versions]
 
+@router.get("/{id}/messages")
+async def get_project_messages(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.models import Message, Conversation
+    # Verify project ownership
+    result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Get the primary conversation for the project, or return empty if none
+    conv_result = await db.execute(select(Conversation).filter(Conversation.projectId == id).order_by(Conversation.createdAt.asc()))
+    conversation = conv_result.scalars().first()
+    
+    if not conversation:
+        return []
+        
+    # Get messages for the conversation
+    msg_result = await db.execute(select(Message).filter(Message.conversationId == conversation.id).order_by(Message.createdAt.asc()))
+    messages = msg_result.scalars().all()
+    
+    return [{
+        "sender": m.sender,
+        "content": m.content,
+        "createdAt": m.createdAt
+    } for m in messages]
+
 # --- LIVE SPECIFICATION EDITING & RETRIEVAL ---
 
 class DocumentationUpdate(BaseModel):
@@ -287,7 +333,7 @@ async def update_project_architecture(id: str, payload: ArchitectureUpdatePayloa
 
 # --- DEPLOYMENT / WEBSOCKET ---
 @router.post("/{id}/deploy")
-async def deploy_project(id: str, deployment_data: DeploymentCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def deploy_project(id: str, deployment_data: DeploymentCreate, current_user: User = Depends(require_role("admin")), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
     project = result.scalars().first()
     if not project:
@@ -338,3 +384,62 @@ async def websocket_endpoint(websocket: WebSocket, id: str):
             data = await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket, id)
+
+@router.get("/{id}/compare")
+async def compare_versions(id: str, v1: int, v2: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    v1_result = await db.execute(select(ArchitectureVersion).filter(ArchitectureVersion.projectId == id, ArchitectureVersion.versionNumber == v1))
+    v1_version = v1_result.scalars().first()
+    if not v1_version:
+        raise HTTPException(status_code=404, detail=f"Version {v1} not found")
+        
+    v2_result = await db.execute(select(ArchitectureVersion).filter(ArchitectureVersion.projectId == id, ArchitectureVersion.versionNumber == v2))
+    v2_version = v2_result.scalars().first()
+    if not v2_version:
+        raise HTTPException(status_code=404, detail=f"Version {v2} not found")
+        
+    v1_data = v1_version.architectureData or {}
+    v2_data = v2_version.architectureData or {}
+    
+    v1_components = v1_data.get("components", [])
+    v2_components = v2_data.get("components", [])
+    
+    v1_comp_ids = {c.get("id") or c.get("name"): c for c in v1_components}
+    v2_comp_ids = {c.get("id") or c.get("name"): c for c in v2_components}
+    
+    added_components = [c for k, c in v2_comp_ids.items() if k not in v1_comp_ids]
+    removed_components = [c for k, c in v1_comp_ids.items() if k not in v2_comp_ids]
+    
+    v1_apis = v1_data.get("apis", [])
+    v2_apis = v2_data.get("apis", [])
+    
+    v1_api_paths = {a.get("path"): a for a in v1_apis}
+    v2_api_paths = {a.get("path"): a for a in v2_apis}
+    
+    added_apis = [a for k, a in v2_api_paths.items() if k not in v1_api_paths]
+    removed_apis = [a for k, a in v1_api_paths.items() if k not in v2_api_paths]
+    
+    v1_tables = v1_data.get("database_schema", [])
+    v2_tables = v2_data.get("database_schema", [])
+    
+    v1_table_names = {t.get("name"): t for t in v1_tables}
+    v2_table_names = {t.get("name"): t for t in v2_tables}
+    
+    added_tables = [t for k, t in v2_table_names.items() if k not in v1_table_names]
+    removed_tables = [t for k, t in v1_table_names.items() if k not in v2_table_names]
+    
+    return {
+        "v1": v1,
+        "v2": v2,
+        "added_components": added_components,
+        "removed_components": removed_components,
+        "added_apis": added_apis,
+        "removed_apis": removed_apis,
+        "added_tables": added_tables,
+        "removed_tables": removed_tables,
+        "summary": f"Added {len(added_components)} components, removed {len(removed_apis)} API, added {len(added_tables)} tables"
+    }

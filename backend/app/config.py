@@ -13,6 +13,14 @@ class Settings:
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+    def __init__(self):
+        # Validate critical security configurations on startup
+        if self.JWT_SECRET == "supersecretkey123":
+            print("\n" + "="*80)
+            print(" SECURITY WARNING: 'JWT_SECRET' is set to default 'supersecretkey123'!")
+            print(" Please configure a strong custom key in your '.env' file in production.")
+            print("="*80 + "\n")
+
     @property
     def get_db_url(self) -> str:
         if self.DATABASE_URL:

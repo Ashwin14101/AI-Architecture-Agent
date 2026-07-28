@@ -19,13 +19,27 @@ class BaseAgent(ABC):
 
     def log_start(self, context: AgentContext, message: str = "Agent started execution."):
         print(f"[{self.name}] {message}")
-        context.log(self.name, "started", message)
+        context.log(self.name, "started", message, llm_model=getattr(self.llm, "model", None))
 
-    def log_success(self, context: AgentContext, message: str = "Agent completed execution."):
-        print(f"[{self.name}] {message}")
-        context.log(self.name, "completed", message)
+    def log_success(self, context: AgentContext, message: str = "Agent completed execution.", duration_seconds: float = 0.0, input_tokens: int = 0, output_tokens: int = 0):
+        print(f"[{self.name}] {message} (Duration: {duration_seconds:.2f}s)")
+        context.log(
+            self.name, 
+            "completed", 
+            message, 
+            duration_seconds=duration_seconds, 
+            input_tokens=input_tokens, 
+            output_tokens=output_tokens, 
+            llm_model=getattr(self.llm, "model", None)
+        )
 
-    def log_failure(self, context: AgentContext, error: str):
+    def log_failure(self, context: AgentContext, error: str, duration_seconds: float = 0.0):
         message = f"Agent failed: {error}"
         print(f"[{self.name}] ERROR: {message}")
-        context.log(self.name, "failed", message)
+        context.log(
+            self.name, 
+            "failed", 
+            message, 
+            duration_seconds=duration_seconds, 
+            llm_model=getattr(self.llm, "model", None)
+        )

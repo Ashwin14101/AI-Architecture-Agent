@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import './AiPanel.css';
+import { api } from '../api';
 
 const AVAILABLE_MODELS = [
   'Gemini 3.5 Flash (High)',
@@ -496,6 +497,24 @@ export default function AiPanel() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pipelineCardVisible]);
+  
+  useEffect(() => {
+    async function loadMessages() {
+      if (currentProject?.id) {
+        try {
+          const pastMessages = await api.getMessages(currentProject.id);
+          if (pastMessages && pastMessages.length > 0) {
+            setMessages(pastMessages.map(m => ({ sender: m.sender, content: m.content })));
+          } else {
+            setMessages([{ sender: 'assistant', content: GREETING, isMarkdown: true }]);
+          }
+        } catch(e) {
+          console.error("Failed to load messages", e);
+        }
+      }
+    }
+    loadMessages();
+  }, [currentProject?.id]);
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) {
@@ -539,7 +558,9 @@ export default function AiPanel() {
 
     if (filesToUpload.length > 0 && projectId) {
       try {
-        await useStore.getState().uploadDoc(filesToUpload);
+        await api.uploadDocument(projectId, filesToUpload[0]);
+        const docs = await api.getDocuments(projectId);
+        useStore.setState({ uploadedDocuments: docs || [] });
       } catch (err) {
         console.error(err);
       }

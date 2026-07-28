@@ -96,6 +96,10 @@ class AgentLog(BaseModel):
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     status: str  # started, completed, failed
     message: str
+    duration_seconds: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    llm_model: Optional[str] = None
 
 class AgentContext(BaseModel):
     project_id: str
@@ -113,9 +117,13 @@ class AgentContext(BaseModel):
     agent_logs: List[AgentLog] = []
     retrieved_knowledge: List[str] = []
 
-    def log(self, agent_name: str, status: str, message: str):
+    def log(self, agent_name: str, status: str, message: str, duration_seconds: float = 0.0, input_tokens: int = 0, output_tokens: int = 0, llm_model: Optional[str] = None):
         self.agent_logs.append(AgentLog(
             agent_name=agent_name,
             status=status,
-            message=message
+            message=message,
+            duration_seconds=duration_seconds,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            llm_model=llm_model
         ))

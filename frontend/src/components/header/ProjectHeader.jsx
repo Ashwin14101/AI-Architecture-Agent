@@ -5,6 +5,7 @@ import {
   Star, Bell, Settings, X
 } from 'lucide-react';
 import useStore from '../../store/useStore';
+import ArchitectureWalkthroughModal from './ArchitectureWalkthroughModal';
 import './ProjectHeader.css';
 
 export default function ProjectHeader() {
@@ -33,6 +34,7 @@ export default function ProjectHeader() {
   const [showSearch,        setShowSearch]        = useState(false);
   const [searchQuery,       setSearchQuery]       = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showWalkthrough,   setShowWalkthrough]   = useState(false);
 
   // Close panels on outside click or Escape
   useEffect(() => {
@@ -166,34 +168,12 @@ export default function ProjectHeader() {
         {/* ── Divider ── */}
         <div className="nav-vdiv" />
 
-        {/* ── Project Selector ── */}
+        {/* ── Project Display ── */}
         <div className="nav-project-wrap">
-          <button className="nav-project-btn" onClick={() => setIsOpen(!isOpen)}>
+          <div className="nav-project-btn" style={{ cursor: 'default' }}>
             <div className="nav-proj-dot" />
-            <span>{currentProject ? currentProject.name : 'Select Project'}</span>
-            <ChevronDown size={13} style={{ opacity: 0.6 }} />
-          </button>
-
-          {isOpen && (
-            <div className="nav-dropdown">
-              <div className="nav-dd-label">Projects</div>
-              {projects.map((p) => (
-                <button
-                  key={p.id}
-                  className={`nav-dd-item ${currentProject?.id === p.id ? 'active' : ''}`}
-                  onClick={() => { selectProject(p); setIsOpen(false); }}
-                >
-                  <div className="nav-dd-dot" style={currentProject?.id === p.id ? { background: '#8b5cf6' } : {}} />
-                  {p.name}
-                  {currentProject?.id === p.id && <CheckCircle2 size={13} color="#8b5cf6" style={{ marginLeft: 'auto' }} />}
-                </button>
-              ))}
-              <div className="nav-dd-sep" />
-              <button className="nav-dd-create" onClick={() => { setShowCreate(true); setIsOpen(false); }}>
-                <Plus size={13} /> New Project
-              </button>
-            </div>
-          )}
+            <span>{currentProject ? currentProject.name : 'No Project Selected'}</span>
+          </div>
         </div>
 
         {/* ── Center Tab Switcher ── */}
@@ -222,9 +202,15 @@ export default function ProjectHeader() {
         {/* ── Right Actions ── */}
         <div className="nav-right" style={{ position: 'relative' }}>
           {hasGeneratedData && (
-            <button className="nav-icon-btn" onClick={handleExportPDF} title="Export PDF">
-              <FileText size={15} />
-            </button>
+            <>
+              <button className="nav-icon-btn explain-btn" onClick={() => setShowWalkthrough(true)} title="Explain Architecture">
+                <Sparkles size={15} />
+                <span style={{ fontSize: 13, fontWeight: 600, marginLeft: 6 }}>Explain</span>
+              </button>
+              <button className="nav-icon-btn" onClick={handleExportPDF} title="Export PDF">
+                <FileText size={15} />
+              </button>
+            </>
           )}
 
           {/* Search Toggle */}
@@ -419,6 +405,11 @@ export default function ProjectHeader() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── Walkthrough Modal ── */}
+      {showWalkthrough && (
+        <ArchitectureWalkthroughModal onClose={() => setShowWalkthrough(false)} />
       )}
     </>
   );

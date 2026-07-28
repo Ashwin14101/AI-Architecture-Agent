@@ -96,6 +96,60 @@ const useStore = create((set, get) => {
     currentProject: null,
     uploadedDocument: null,
     uploadedDocuments: [],
+    selectedNode: null,
+    securityFindings: [],
+    costData: null,
+    setSelectedNode: (node) => set({ selectedNode: node }),
+    setSecurityFindings: (findings) => set({ securityFindings: findings }),
+    setCostData: (data) => set({ costData: data }),
+    fetchCostData: async (projectId) => {
+      try {
+        const token = get().token;
+        const res = await fetch(`http://localhost:3000/api/analysis/${projectId}/cost`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          set({ costData: data });
+        }
+      } catch (e) { console.error('Cost fetch error:', e); }
+    },
+    fetchScanResults: async (projectId) => {
+      try {
+        const token = get().token;
+        const res = await fetch(`http://localhost:3000/api/analysis/${projectId}/scan-results`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          set({ securityFindings: data.findings || [] });
+        }
+      } catch (e) { console.error('Scan fetch error:', e); }
+    },
+    runSecurityScan: async (projectId) => {
+      try {
+        const token = get().token;
+        const res = await fetch(`http://localhost:3000/api/analysis/${projectId}/scan`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          set({ securityFindings: data.findings || [] });
+          return data;
+        }
+      } catch (e) { console.error('Scan error:', e); }
+    },
+    fetchDiff: async (projectId, v1, v2) => {
+      try {
+        const token = get().token;
+        const res = await fetch(`http://localhost:3000/api/projects/${projectId}/compare?v1=${v1}&v2=${v2}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) return await res.json();
+      } catch (e) { console.error('Diff error:', e); }
+      return null;
+    },
 
     // Canvas UI
     activeTool: 'select',
@@ -435,9 +489,23 @@ Overall architecture quality score: **96/100** ✅`,
             set({ qualityScore: review.score });
           }
           await get().fetchGeneratedData(project.id);
+          
+          try {
+            const docs = await api.getDocuments(project.id);
+            set({ uploadedDocuments: docs || [] });
+          } catch(e) {
+            console.log("No documents found or error fetching docs");
+          }
         }
       } catch (e) {
         console.log("No existing design for selected project");
+        // Still try to fetch documents even if no architecture exists
+        try {
+          const docs = await api.getDocuments(project.id);
+          set({ uploadedDocuments: docs || [] });
+        } catch(err) {
+          // ignore
+        }
       }
     },
 

@@ -5,6 +5,7 @@ import ProjectHeader from './components/header/ProjectHeader';
 import DetailsPanel from './components/details/DetailsPanel';
 import AiPanel from './components/chat/AiPanel';
 import PipelineDrawer from './components/drawer/PipelineDrawer';
+import HistorySidebar from './components/sidebar/HistorySidebar';
 import useStore from './store/useStore';
 import './App.css';
 
@@ -32,18 +33,22 @@ export default function App() {
   return (
     <ReactFlowProvider>
       <div className="app-shell">
-        {/* Top Header Selector & Exporters */}
-        <ProjectHeader />
+        <HistorySidebar />
+        
+        <div className="app-main-workspace">
+          {/* Top Header Selector & Exporters */}
+          <ProjectHeader />
 
-        {/* Tab-driven main area */}
-        <div className="app-main-content">
-          {currentTab === 'chat' ? (
-            <AiPanel />
-          ) : (
-            <>
-              <AgentCanvas />
-            </>
-          )}
+          {/* Tab-driven main area */}
+          <div className="app-main-content">
+            {currentTab === 'chat' ? (
+              <AiPanel />
+            ) : (
+              <>
+                <AgentCanvas />
+              </>
+            )}
+          </div>
         </div>
 
 

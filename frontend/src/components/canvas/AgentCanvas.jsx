@@ -17,13 +17,17 @@ import AnimatedEdge from '../edges/AnimatedEdge';
 import StatusBar from '../statusbar/StatusBar';
 import ContextMenu from '../menu/ContextMenu';
 import useStore from '../../store/useStore';
+import ArchitectureSummaryBar from '../summary/ArchitectureSummaryBar';
+import LayerFilterBar from './LayerFilterBar';
+import FlowSimulator from './FlowSimulator';
+import { applyHierarchicalLayout, applyRadialLayout, applyGridLayout } from '../../utils/layoutUtils';
 import './AgentCanvas.css';
 
 import {
   Database as DbIcon, Globe, Network, Loader2, FileText, Code, Save,
   Trash2, Clock, MousePointer, Sparkles, Download, Eye, Edit3,
   X, Zap, Play, Square, Check, Hand, Maximize2, Layers,
-  Plus, Type,
+  Plus, Type, Shield
 } from 'lucide-react';
 
 const nodeTypes = { systemComponentNode: SystemComponentNode, dbTableNode: DbTableNode, apiEndpointNode: ApiEndpointNode };
@@ -36,6 +40,8 @@ const SQL_SCHEMA = (tables) => tables.map((t) => {
 
 const VIEW_TABS = [
   { id: 'system',    label: 'System Context', Icon: Network,  color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
+  { id: 'cloud',     label: 'Cloud View',     Icon: Globe,    color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)' },
+  { id: 'security',  label: 'Security View',  Icon: Shield,   color: '#f43f5e', bg: 'rgba(244,63,94,0.1)' },
   { id: 'database',  label: 'DB Schema',       Icon: DbIcon,   color: '#f97316', bg: 'rgba(249,115,22,0.1)' },
   { id: 'apis',      label: 'API Specs',        Icon: Globe,    color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
   { id: 'docs',      label: 'Documentation',    Icon: FileText, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
@@ -226,6 +232,8 @@ function ZoomControls() {
 // ── Main Canvas Component ────────────────────────────────────────────
 function AgentCanvasInner() {
   const selectNode         = useStore((s) => s.selectNode);
+  const selectedNode       = useStore((s) => s.selectedNode);
+  const setSelectedNode    = useStore((s) => s.setSelectedNode);
   const setZoomLevel       = useStore((s) => s.setZoomLevel);
   const canvasViewMode     = useStore((s) => s.canvasViewMode);
   const setCanvasViewMode  = useStore((s) => s.setCanvasViewMode);
@@ -247,6 +255,14 @@ function AgentCanvasInner() {
   const unsavedChanges            = useStore((s) => s.unsavedChanges);
   const activeTool                = useStore((s) => s.activeTool);
   const setActiveTool             = useStore((s) => s.setActiveTool);
+  
+  const [layoutMode, setLayoutMode] = useState('grid');
+  const [diffV1, setDiffV1] = useState(null);
+  const [diffV2, setDiffV2] = useState(null);
+  const [diffData, setDiffData] = useState(null);
+  const [diffActive, setDiffActive] = useState(false);
+  const [activeLayers, setActiveLayers] = useState(['presentation', 'application', 'data']);
+  const fetchDiff = useStore(s => s.fetchDiff);
 
   const { fitView } = useReactFlow();
   const reactFlowWrapper = useRef(null);
@@ -384,17 +400,106 @@ function AgentCanvasInner() {
       const comps = generatedData.components || [];
       const COLS = 3;
       const COL_W = 380, ROW_H = 260;
-      const ns = comps.map((c, i) => ({
-        id: c.id || `comp-${i}`,
-        type: 'systemComponentNode',
-        position: { x: 80 + (i % COLS) * COL_W, y: 80 + Math.floor(i / COLS) * ROW_H },
-        data: { name: c.name, type: c.type, description: c.description },
-      }));
+      
+      const addedIds = (diffData?.added_components || []).map(c => c.id || c.name);
+      const removedIds = (diffData?.removed_components || []).map(c => c.id || c.name);
+      
+      // Basic layer mapping heuristics based on name/type
+      const getLayer = (c) => {
+        const typeStr = (c.type || '').toLowerCase();
+        const nameStr = (c.name || '').toLowerCase();
+        if (typeStr.includes('db') || typeStr.includes('database') || nameStr.includes('db')) return 'data';
+        if (typeStr.includes('ui') || typeStr.includes('frontend') || typeStr.includes('client')) return 'presentation';
+        return 'application';
+      };
+
+      const filteredComps = comps.filter(c => activeLayers.includes(getLayer(c)));
+      
+      let ns = filteredComps.map((c, i) => {
+        let diffStatus = 'unchanged';
+        if (diffActive) {
+          if (addedIds.includes(c.id || c.name)) diffStatus = 'added';
+          else if (removedIds.includes(c.id || c.name)) diffStatus = 'removed';
+        }
+        return {
+          id: c.id || `comp-${i}`,
+          type: 'systemComponentNode',
+          position: { x: 0, y: 0 },
+          data: { name: c.name, type: c.type, description: c.description, diffStatus },
+        };
+      });
       const es = [];
       for (let i = 0; i < ns.length - 1; i++) {
-        es.push({ id: `e-s-${i}`, source: ns[i].id, target: ns[i + 1].id, type: 'animated', data: { status: 'success' } });
+        es.push({ id: `e-s-${i}`, source: ns[i].id, target: ns[i + 1].id, type: 'animated', data: { status: 'success', label: 'REST' } });
       }
+      
+      if (layoutMode === 'hierarchical') ns = applyHierarchicalLayout(ns, es);
+      else if (layoutMode === 'radial') ns = applyRadialLayout(ns);
+      else ns = applyGridLayout(ns, COLS);
+      
       setNodes(ns); setEdges(es); return;
+    }
+
+    if (canvasViewMode === 'cloud') {
+      const comps = generatedData.components || [];
+      const mappings = generatedData.cloud_mappings || [];
+      const COLS = 3, COL_W = 380, ROW_H = 260;
+      let ns = comps.map((c, i) => {
+        const mapping = mappings.find(m => 
+          m.logical_component?.toLowerCase() === c.name?.toLowerCase() ||
+          m.component_id === c.id
+        );
+        return {
+          id: c.id || `comp-${i}`,
+          type: 'systemComponentNode',
+          position: { x: 0, y: 0 },
+          data: {
+            name: mapping?.aws_service || c.name,
+            type: 'AWS Service',
+            description: mapping ? `${c.name} → ${mapping.aws_service}` : c.description,
+            cloudBadge: mapping?.aws_service,
+            isCloudView: true,
+          },
+        };
+      });
+      const es = ns.slice(0,-1).map((n, i) => ({ id: `e-cloud-${i}`, source: n.id, target: ns[i+1].id, type: 'animated', data: { status: 'success', label: 'AWS' } }));
+      
+      if (layoutMode === 'hierarchical') ns = applyHierarchicalLayout(ns, es);
+      else if (layoutMode === 'radial') ns = applyRadialLayout(ns);
+      else ns = applyGridLayout(ns, COLS);
+      
+      setNodes(ns); setEdges(es); return;
+    }
+
+    if (canvasViewMode === 'security') {
+      const comps = generatedData.components || [];
+      const findings = useStore.getState().securityFindings || [];
+      const COLS = 3, COL_W = 380, ROW_H = 260;
+      let ns = comps.map((c, i) => {
+        const compFindings = findings.filter(f => 
+          f.resource?.toLowerCase().includes(c.name?.toLowerCase().replace(/\s+/g, '_'))
+        );
+        const hasCritical = compFindings.some(f => f.severity === 'HIGH' || f.severity === 'CRITICAL');
+        const hasWarn = compFindings.some(f => f.severity === 'MEDIUM');
+        const status = hasCritical ? 'critical' : hasWarn ? 'warning' : findings.length > 0 ? 'clean' : 'unknown';
+        return {
+          id: c.id || `comp-${i}`,
+          type: 'systemComponentNode',
+          position: { x: 0, y: 0 },
+          data: {
+            name: c.name,
+            type: c.type,
+            description: compFindings.length > 0 ? `${compFindings.length} security issues` : 'No issues found',
+            securityStatus: status,
+            isSecurityView: true,
+          },
+        };
+      });
+      
+      if (layoutMode === 'radial') ns = applyRadialLayout(ns);
+      else ns = applyGridLayout(ns, COLS);
+      
+      setNodes(ns); setEdges([]); return;
     }
 
     if (canvasViewMode === 'database') {
@@ -419,7 +524,7 @@ function AgentCanvasInner() {
               sourceHandle: 'col-id',
               targetHandle: `col-${c.name}`,
               type: 'animated',
-              data: { status: 'success' }
+              data: { status: 'success', label: 'SQL' }
             });
           }
         });
@@ -489,8 +594,17 @@ function AgentCanvasInner() {
   }, [canvasViewMode, generatedData, pipelineStatus, pipelineProgress, currentAgent, setNodes, setEdges]);
 
   const onNodeClick = useCallback((_, node) => {
-    // No-op to prevent the details drawer from popping up on node click
-  }, []);
+    setSelectedNode(node);
+  }, [setSelectedNode]);
+
+  const handleDiffCompare = async () => {
+    if (!diffV1 || !diffV2 || !currentProject) return;
+    const diff = await fetchDiff(currentProject.id, diffV1, diffV2);
+    if (diff) {
+      setDiffData(diff);
+      setDiffActive(true);
+    }
+  };
 
   const onMoveEnd = useCallback((_, vp) => setZoomLevel(vp.zoom), [setZoomLevel]);
 
@@ -822,6 +936,40 @@ function AgentCanvasInner() {
             </select>
           </div>
         )}
+        <div className="ctab-layout">
+          <Layers size={11} />
+          <select
+            value={layoutMode}
+            onChange={(e) => {
+              const mode = e.target.value;
+              setLayoutMode(mode);
+              let laidOut;
+              if (mode === 'hierarchical') laidOut = applyHierarchicalLayout(nodes, edges);
+              else if (mode === 'radial') laidOut = applyRadialLayout(nodes);
+              else laidOut = applyGridLayout(nodes);
+              setNodes(laidOut);
+            }}
+            className="ctab-layout-select"
+          >
+            <option value="grid">Grid Layout</option>
+            <option value="hierarchical">Hierarchical</option>
+            <option value="radial">Radial</option>
+          </select>
+        </div>
+        {hasData && versions.length >= 2 && (
+          <div className="ctab-compare">
+            <span style={{ fontSize: 10, color: '#94a3b8' }}>Compare:</span>
+            <select className="ctab-layout-select" onChange={e => setDiffV1(parseInt(e.target.value))}>
+              {versions.map(v => <option key={v.id} value={v.versionNumber}>v{v.versionNumber}</option>)}
+            </select>
+            <span style={{ fontSize: 10, color: '#94a3b8' }}>vs</span>
+            <select className="ctab-layout-select" onChange={e => setDiffV2(parseInt(e.target.value))} defaultValue={versions[1]?.versionNumber}>
+              {versions.map(v => <option key={v.id} value={v.versionNumber}>v{v.versionNumber}</option>)}
+            </select>
+            <button className="ctab-action" onClick={handleDiffCompare}>Diff</button>
+            {diffActive && <button className="ctab-action" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }} onClick={() => { setDiffActive(false); setDiffData(null); }}>Clear</button>}
+          </div>
+        )}
         {canvasViewMode === 'apis' && hasData && (
           <button className="ctab-action" onClick={() => {
             const d = useStore.getState().generatedData || {};
@@ -1032,7 +1180,7 @@ function AgentCanvasInner() {
 
   // ── Empty Canvas ─────────────────────────────────────────────────
   const EmptyCanvas = () => (
-    <div className="canvas-empty">
+          <div className="canvas-empty">
       <div className="canvas-empty-icon"><Sparkles size={36} color="white" /></div>
       <h2 className="canvas-empty-title">No Architecture Yet</h2>
       <p className="canvas-empty-sub">Upload your requirements document and run the pipeline to generate a beautiful architecture diagram.</p>
@@ -1055,7 +1203,6 @@ function AgentCanvasInner() {
       <div className="canvas-main" ref={reactFlowWrapper}>
         <TabBar />
 
-
         {elementsOpen && hasData && (
           <ElementsPanel
             generatedData={generatedData}
@@ -1064,6 +1211,8 @@ function AgentCanvasInner() {
             setElementsOpen={setElementsOpen}
           />
         )}
+
+        <ArchitectureSummaryBar />
 
         {!hasData && !isRunning ? (
           <EmptyCanvas />

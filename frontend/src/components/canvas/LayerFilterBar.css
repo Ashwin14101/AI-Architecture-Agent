@@ -1,0 +1,51 @@
+.layer-filter-bar {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.lfb-icon {
+  color: #64748b;
+  display: flex;
+  align-items: center;
+}
+
+.lfb-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-right: 4px;
+}
+
+.lfb-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lfb-btn:hover {
+  background: #f1f5f9;
+}
+
+.lfb-btn.active {
+  background: var(--layer-color);
+  color: white;
+  border-color: var(--layer-color);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}

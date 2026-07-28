@@ -71,16 +71,35 @@ export const api = {
     return res.json();
   },
 
+  // Chat endpoints
+  async getMessages(projectId) {
+    const res = await fetch(`${BASE_URL}/projects/${projectId}/messages`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch messages');
+    return res.json();
+  },
+
   // Document upload
   async uploadDocument(projectId, file) {
     const formData = new FormData();
     formData.append('file', file);
     const res = await fetch(`${BASE_URL}/projects/${projectId}/documents`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: {
+        ...getHeaders(),
+      },
       body: formData,
     });
     if (!res.ok) throw new Error('Failed to upload document');
+    return res.json();
+  },
+
+  async getDocuments(projectId) {
+    const res = await fetch(`${BASE_URL}/projects/${projectId}/documents`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch documents');
     return res.json();
   },
 

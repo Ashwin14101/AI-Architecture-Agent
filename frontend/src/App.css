@@ -3,6 +3,14 @@
   height: 100vh;
   position: relative;
   overflow: hidden;
+  display: flex;
+}
+
+.app-main-workspace {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Authentication Loading Screen */
@@ -38,10 +46,7 @@
 }
 
 .app-main-content {
-  position: absolute;
-  top: 78px; /* navbar 56px + 10px top + 12px gap */
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex: 1;
+  position: relative;
   overflow: hidden;
 }

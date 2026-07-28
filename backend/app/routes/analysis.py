@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+import tempfile
+import subprocess
+from app.services.aws_pricing import estimate_architecture_costs
 
 from app.database import get_db
 from app.models import (
@@ -13,6 +16,7 @@ from app.models import (
     ArchitectureVersion, Review, ReviewFinding, AgentExecution
 )
 from app.middleware.auth_middleware import get_current_user
+from app.middleware.rbac_middleware import require_role
 from app.websocket import manager
 
 # Add both the project root and the agents directory to sys.path
@@ -30,8 +34,10 @@ from agents.src.api.api_agent import ApiAgent
 from agents.src.cloud_mapping.cloud_mapping_agent import CloudMappingAgent
 from agents.src.terraform.terraform_agent import TerraformAgent
 from agents.src.security.security_agent import SecurityAgent
+from agents.src.security.iac_scanner import IacScanner
 from agents.src.cost_optimization.cost_agent import CostAgent
 from agents.src.validation.validation_agent import ValidationAgent
+from agents.src.validation.programmatic_validator import ProgrammaticValidator
 from agents.src.review.review_agent import ReviewAgent
 from agents.src.documentation.documentation_agent import DocumentationAgent
 from agents.src.versioning.versioning_agent import VersioningAgent
@@ -72,8 +78,10 @@ async def run_pipeline_task(project_id: str, db_session_factory):
                 ("Cloud AWS Mapping", CloudMappingAgent()),
                 ("Terraform Code Compiling", TerraformAgent()),
                 ("Security Auditing", SecurityAgent()),
+                ("Programmatic IaC Scan", IacScanner()),
                 ("Cost Optimization", CostAgent()),
                 ("Syntax Validation", ValidationAgent()),
+                ("Programmatic Syntax Validation", ProgrammaticValidator()),
                 ("Review Scoring", ReviewAgent()),
                 ("Documentation Compilation", DocumentationAgent()),
                 ("Versioning", VersioningAgent()),
@@ -228,7 +236,7 @@ async def run_pipeline_task(project_id: str, db_session_factory):
             })
 
 @router.post("/{projectId}/start")
-async def start_analysis(projectId: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def start_analysis(projectId: str, background_tasks: BackgroundTasks, current_user: User = Depends(require_role("admin", "architect", "user")), db: AsyncSession = Depends(get_db)):
     # Verify project exists
     result = await db.execute(select(Project).filter(Project.id == projectId, Project.ownerId == current_user.id))
     project = result.scalars().first()
@@ -240,3 +248,141 @@ async def start_analysis(projectId: str, background_tasks: BackgroundTasks, curr
     background_tasks.add_task(run_pipeline_task, projectId, SessionLocal)
     
     return {"status": "success", "message": "Analysis started"}
+
+@router.post("/{projectId}/scan")
+async def run_security_scan(projectId: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).filter(Project.id == projectId, Project.ownerId == current_user.id))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    ver_result = await db.execute(
+        select(ArchitectureVersion)
+        .filter(ArchitectureVersion.projectId == projectId)
+        .order_by(ArchitectureVersion.versionNumber.desc())
+    )
+    latest_version = ver_result.scalars().first()
+    if not latest_version or not latest_version.terraformCode:
+        return {"error": "No Terraform code generated yet"}
+
+    tf_code = latest_version.terraformCode
+    tmpdir = tempfile.mkdtemp()
+    tf_path = os.path.join(tmpdir, 'main.tf')
+    with open(tf_path, 'w') as f:
+        f.write(tf_code)
+
+    try:
+        run_result = subprocess.run(['checkov', '-d', tmpdir, '--output', 'json', '--quiet'], capture_output=True, text=True, timeout=60)
+        data = json.loads(run_result.stdout)
+    except FileNotFoundError:
+        return {"error": "Checkov not installed", "install": "pip install checkov"}
+    except Exception as e:
+        return {"error": str(e)}
+
+    if isinstance(data, list):
+        data = data[0] if data else {}
+
+    results = data.get("results", {})
+    failed_checks = results.get("failed_checks", [])
+    
+    findings = []
+    for check in failed_checks:
+        findings.append({
+            "check_id": check.get("check_id"),
+            "resource": check.get("resource"),
+            "title": check.get("check_name"),
+            "severity": check.get("severity") or "MEDIUM",
+            "status": "FAILED"
+        })
+        
+        # Save finding to DB
+        db_finding = ReviewFinding(
+            reviewId=latest_version.id,  # using versionId as reviewId for simplicity if no review exists
+            ruleId=check.get("check_id", "UNKNOWN"),
+            severity=check.get("severity") or "MEDIUM",
+            description=check.get("check_name", "Security finding"),
+            recommendation="Review security configuration",
+            status="pending"
+        )
+        db.add(db_finding)
+        
+    await db.commit()
+
+    response = {
+        "project_id": projectId,
+        "scan_status": "complete",
+        "total_checks": len(failed_checks) + len(results.get("passed_checks", [])),
+        "failed": len(failed_checks),
+        "findings": findings
+    }
+    # Cache results so GET /scan-results can retrieve them
+    SCAN_RESULTS_CACHE[projectId] = response
+    return response
+
+# In-memory cache for scan results (populated by POST /scan)
+SCAN_RESULTS_CACHE = {}
+
+@router.get("/{projectId}/scan-results")
+async def get_security_scan(projectId: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).filter(Project.id == projectId, Project.ownerId == current_user.id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # First try in-memory cache (populated by POST /scan)
+    if projectId in SCAN_RESULTS_CACHE:
+        return SCAN_RESULTS_CACHE[projectId]
+
+    # Fall back to DB: query ReviewFinding records for this project's latest version
+    ver_result = await db.execute(
+        select(ArchitectureVersion)
+        .filter(ArchitectureVersion.projectId == projectId)
+        .order_by(ArchitectureVersion.versionNumber.desc())
+    )
+    latest_version = ver_result.scalars().first()
+    if not latest_version:
+        return {"message": "No scan results available. Run POST /scan first."}
+
+    findings_result = await db.execute(
+        select(ReviewFinding).filter(ReviewFinding.reviewId == latest_version.id)
+    )
+    findings = findings_result.scalars().all()
+    return {
+        "project_id": projectId,
+        "scan_status": "complete" if findings else "not_run",
+        "failed": len(findings),
+        "findings": [
+            {
+                "check_id": f.ruleId,
+                "resource": "",
+                "title": f.description,
+                "severity": f.severity,
+                "status": "FAILED"
+            } for f in findings
+        ]
+    }
+
+@router.get("/{projectId}/cost")
+async def get_architecture_cost(projectId: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).filter(Project.id == projectId, Project.ownerId == current_user.id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    ver_result = await db.execute(
+        select(ArchitectureVersion)
+        .filter(ArchitectureVersion.projectId == projectId)
+        .order_by(ArchitectureVersion.versionNumber.desc())
+    )
+    latest_version = ver_result.scalars().first()
+    if not latest_version or not latest_version.architectureData:
+        return {"error": "No architecture generated yet"}
+
+    components = latest_version.architectureData.get("components", [])
+    cost_data = estimate_architecture_costs(components)
+    
+    # Save to architectureData
+    arch_data = dict(latest_version.architectureData)
+    arch_data["cost_breakdown"] = cost_data
+    latest_version.architectureData = arch_data
+    await db.commit()
+
+    return cost_data

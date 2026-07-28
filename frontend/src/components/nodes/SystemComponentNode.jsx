@@ -2,7 +2,7 @@ import React, { memo, useState, useRef, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import {
   Server, Database, Network, Cpu, ShieldCheck, Globe,
-  Zap, Lock, Cloud, GitBranch, Box, ChevronDown
+  Zap, Lock, Cloud, GitBranch, Box, ChevronDown, DollarSign, Shield
 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import './SystemComponentNode.css';
@@ -27,10 +27,18 @@ const ALL_TYPES = [
 ];
 
 function SystemComponentNode({ id, selected, data }) {
-  const { name, type, description } = data;
+  const { name, type, description, diffStatus, isCloudView, cloudBadge } = data;
   const typeLower = (type || 'default').toLowerCase().replace(/\s+/g, '-');
   const meta = TYPE_META[typeLower] || TYPE_META['default'];
   const { Icon, gradient, accent, badge, badgeText } = meta;
+
+  const costData = useStore(s => s.costData);
+  const securityFindings = useStore(s => s.securityFindings);
+
+  const compCost = costData?.per_component?.find(c => c.component_id === id || c.name === name);
+  const compSec = (securityFindings || []).filter(f => f.resource?.toLowerCase().includes(name?.toLowerCase().replace(/\s+/g, '_')));
+  const hasCritical = compSec.some(f => f.severity === 'HIGH' || f.severity === 'CRITICAL');
+  const hasWarn = compSec.some(f => f.severity === 'MEDIUM');
 
   // ── Edit states ──────────────────────────────────────────────────
   const [editingName,  setEditingName]  = useState(false);
@@ -96,6 +104,26 @@ function SystemComponentNode({ id, selected, data }) {
       {/* Icon badge */}
       <div className="scn-icon-wrap" style={{ background: gradient }}>
         <Icon size={18} color="white" strokeWidth={1.8} />
+      </div>
+
+      <div className="scn-health-badges">
+        {compCost && (
+          <div className="scn-hb cost">
+            <DollarSign size={10} /> ${compCost.monthly_usd}/mo
+          </div>
+        )}
+        {hasCritical ? (
+          <div className="scn-hb critical">
+            <Shield size={10} /> {compSec.length}
+          </div>
+        ) : hasWarn ? (
+          <div className="scn-hb warning">
+            <Shield size={10} /> {compSec.length}
+          </div>
+        ) : null}
+        {diffStatus === 'added' && <div className="scn-hb diff-added">+ Added</div>}
+        {diffStatus === 'removed' && <div className="scn-hb diff-removed">- Removed</div>}
+        {isCloudView && cloudBadge && <div className="scn-hb cloud">{cloudBadge}</div>}
       </div>
 
       {/* Content */}

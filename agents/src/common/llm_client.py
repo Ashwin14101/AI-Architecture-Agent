@@ -69,10 +69,9 @@ class LlmClient:
             print(f"[LlmClient] Fallback to {new_provider.upper()} failed: {str(e)}")
             return False
 
-    def call(self, system_prompt: str, user_prompt: str, json_mode: bool = False, temperature: float = 0.2) -> str:
+    def call_with_meta(self, system_prompt: str, user_prompt: str, json_mode: bool = False, temperature: float = 0.2):
         """
-        Runs completions. If rate limit hits, rotates keys. 
-        If all keys rate-limit, attempts fallback to the other provider.
+        Runs completions and returns tuple: (content_str, usage_dict, model_name).
         """
         while True:
             try:
@@ -86,18 +85,30 @@ class LlmClient:
                     temperature=temperature,
                     response_format=response_format
                 )
-                return completion.choices[0].message.content or ""
+                content = completion.choices[0].message.content or ""
+                prompt_tokens = getattr(completion.usage, "prompt_tokens", 0) if completion.usage else 0
+                completion_tokens = getattr(completion.usage, "completion_tokens", 0) if completion.usage else 0
+                usage = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens
+                }
+                return content, usage, self.model
 
             except RateLimitError as e:
                 print(f"[LlmClient] Rate Limit hit on {self.provider.upper()} key {self.current_key_index}")
-                # Try rotating key first
                 if self._rotate_key():
                     continue
-                # If rotation fails (or only 1 key), try fallback to alternative provider
                 if self._switch_provider_fallback():
                     continue
-                # Both key rotation and fallback failed, raise original error
                 raise e
             except Exception as e:
                 print(f"[LlmClient] Exception: {str(e)}")
                 raise e
+
+    def call(self, system_prompt: str, user_prompt: str, json_mode: bool = False, temperature: float = 0.2) -> str:
+        """
+        Runs completions. If rate limit hits, rotates keys. 
+        If all keys rate-limit, attempts fallback to the other provider.
+        """
+        content, _, _ = self.call_with_meta(system_prompt, user_prompt, json_mode, temperature)
+        return content

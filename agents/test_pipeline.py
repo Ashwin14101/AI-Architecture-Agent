@@ -11,8 +11,10 @@ from src.api.api_agent import ApiAgent
 from src.cloud_mapping.cloud_mapping_agent import CloudMappingAgent
 from src.terraform.terraform_agent import TerraformAgent
 from src.security.security_agent import SecurityAgent
+from src.security.iac_scanner import IacScanner
 from src.cost_optimization.cost_agent import CostAgent
 from src.validation.validation_agent import ValidationAgent
+from src.validation.programmatic_validator import ProgrammaticValidator
 from src.review.review_agent import ReviewAgent
 from src.documentation.documentation_agent import DocumentationAgent
 from src.versioning.versioning_agent import VersioningAgent
@@ -50,8 +52,10 @@ def test():
     cloud_agent = CloudMappingAgent()
     tf_agent = TerraformAgent()
     sec_agent = SecurityAgent()
+    iac_scanner = IacScanner()
     cost_agent = CostAgent()
     val_agent = ValidationAgent()
+    prog_val_agent = ProgrammaticValidator()
     review_agent = ReviewAgent()
     doc_gen_agent = DocumentationAgent()
     version_agent = VersioningAgent()
@@ -85,11 +89,17 @@ def test():
         # Step 9: Run Security Audit
         context = sec_agent.run(context)
 
+        # Step 9.5: Run Programmatic IaC Scan
+        context = iac_scanner.run(context)
+
         # Step 10: Run Cost Optimization
         context = cost_agent.run(context)
 
         # Step 11: Run Code Validation
         context = val_agent.run(context)
+
+        # Step 11.5: Run Programmatic Syntax Validation
+        context = prog_val_agent.run(context)
 
         # Step 12: Run final Architecture review & scoring
         context = review_agent.run(context)

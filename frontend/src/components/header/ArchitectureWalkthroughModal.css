@@ -1,0 +1,123 @@
+.awm-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.awm-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: modal-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-up {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.awm-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+}
+
+.awm-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.awm-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.awm-close {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.awm-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.awm-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  background: white;
+  position: relative;
+}
+
+.awm-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 200px;
+  color: #64748b;
+}
+
+.awm-loading p {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.awm-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.awm-streaming-indicator {
+  display: inline-block;
+  margin-left: 4px;
+  color: #8b5cf6;
+  font-weight: bold;
+}
+
+.awm-streaming-indicator .dot {
+  animation: blink 1.4s infinite both;
+}
+
+.awm-streaming-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+.awm-streaming-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0% { opacity: 0.2; }
+  20% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}

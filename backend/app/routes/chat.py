@@ -6,7 +6,7 @@ import asyncio, os, json
 from openai import AsyncOpenAI
 
 from app.database import get_db
-from app.models import User, Project, ArchitectureVersion, Document
+from app.models import User, Project, ArchitectureVersion, Document, Conversation, Message
 from app.schemas import ChatMessageCreate
 from app.middleware.auth_middleware import get_current_user
 
@@ -135,9 +135,49 @@ async def send_message(
 
 
     context = "\n".join(context_parts)
+    
+    # Save user message to database
+    conv_result = await db.execute(select(Conversation).filter(Conversation.projectId == projectId))
+    conversation = conv_result.scalars().first()
+    
+    if not conversation:
+        conversation = Conversation(projectId=projectId, title="Project Chat")
+        db.add(conversation)
+        await db.commit()
+        await db.refresh(conversation)
+        
+    user_msg = Message(
+        conversationId=conversation.id,
+        sender="user",
+        content=message.content
+    )
+    db.add(user_msg)
+    await db.commit()
+
+    async def stream_wrapper():
+        full_response = ""
+        async for chunk in stream_ai_response(message.content, context):
+            if chunk.startswith("data: ") and not chunk.startswith("data: ⚠️"):
+                # Clean chunk to save
+                cleaned = chunk[6:-2].replace('\\n', '\n')
+                full_response += cleaned
+            yield chunk
+            
+        # After streaming is done, save the assistant message to DB
+        try:
+            # We need a new session or to reuse db if still active, but typically StreamingResponse keeps it active if yielded from a router with Depends
+            assistant_msg = Message(
+                conversationId=conversation.id,
+                sender="assistant",
+                content=full_response
+            )
+            db.add(assistant_msg)
+            await db.commit()
+        except Exception as e:
+            print(f"Error saving AI message: {e}")
 
     return StreamingResponse(
-        stream_ai_response(message.content, context),
+        stream_wrapper(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
