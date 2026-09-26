@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, project, analysis, cloud, chat
+from app.routes import auth, project, analysis, cloud, chat, observability
 from app.database import engine, Base
 
 app = FastAPI(title="AI Architecture Agent API", version="1.0.0")
@@ -26,6 +26,7 @@ app.include_router(project.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(cloud.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(observability.router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():

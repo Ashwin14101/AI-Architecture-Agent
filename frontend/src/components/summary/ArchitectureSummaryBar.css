@@ -1,0 +1,59 @@
+.arch-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface-primary, #ffffff);
+  border-bottom: 1px solid var(--surface-border, #e2e8f0);
+  padding: 8px 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.arch-summary-bar::-webkit-scrollbar { display: none; }
+
+.asb-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 4px 0;
+  white-space: nowrap;
+}
+
+.asb-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.asb-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.asb-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  line-height: 1.1;
+}
+
+.asb-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-tertiary, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.asb-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--surface-border, #e2e8f0);
+  margin: 0 16px 0 0;
+  flex-shrink: 0;
+}

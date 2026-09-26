@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 
@@ -20,33 +20,29 @@ from app.middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
-)
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
-# --------------------------------------------------
-# CREATE JWT ACCESS TOKEN
-# --------------------------------------------------
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
+
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.JWT_EXPIRY_MINUTES
     )
-
-    to_encode.update({
-        "exp": expire
-    })
-
+    to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
         to_encode,
         settings.JWT_SECRET,
         algorithm="HS256"
     )
-
     return encoded_jwt
 
 
@@ -70,7 +66,6 @@ async def register(
             | (User.username == user_data.username)
         )
     )
-
     existing_user = result.scalars().first()
 
     if existing_user:
@@ -80,9 +75,7 @@ async def register(
         )
 
     # Hash password before storing it
-    hashed_password = pwd_context.hash(
-        user_data.password
-    )
+    hashed_password = hash_password(user_data.password)
 
     new_user = User(
         username=user_data.username,
@@ -118,14 +111,10 @@ async def login(
             User.email == login_data.email
         )
     )
-
     user = result.scalars().first()
 
     # Verify email and password
-    if not user or not pwd_context.verify(
-        login_data.password,
-        user.passwordHash
-    ):
+    if not user or not verify_password(login_data.password, user.passwordHash):
         raise HTTPException(
             status_code=401,
             detail="Invalid credentials"
@@ -138,8 +127,6 @@ async def login(
             "role": user.role
         }
     )
-    print("Generated Token:")
-    print(access_token)
     return {
         "accessToken": access_token
     }

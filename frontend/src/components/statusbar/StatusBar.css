@@ -1,0 +1,81 @@
+.statusbar-wrapper {
+  position: fixed;
+  bottom: 24px;
+  right: 80px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-full);
+  padding: 4px 6px;
+  box-shadow: var(--shadow-md);
+  height: var(--statusbar-height);
+}
+
+.statusbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.statusbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--surface-border);
+  margin: 0 4px;
+}
+
+.statusbar-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.statusbar-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.statusbar-zoom-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 38px;
+  text-align: center;
+  user-select: none;
+}
+
+/* Collaboration Avatars */
+.statusbar-avatars {
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.avatar-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-on-dark);
+  border: 2px solid var(--surface-primary);
+  margin-left: -6px;
+}
+
+.avatar-circle:first-child {
+  margin-left: 0;
+}
