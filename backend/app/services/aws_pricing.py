@@ -1,6 +1,5 @@
 # AWS Pricing Service
 # Maps component types to real AWS pricing
-import boto3
 import os
 from functools import lru_cache
 
