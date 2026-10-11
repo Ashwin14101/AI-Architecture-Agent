@@ -1,5 +1,28 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
+// Detect whether a real backend is reachable. On a remote static host
+// (e.g. Render) with no VITE_API_URL configured, localhost points at the
+// visitor's own machine, so we must skip network auth and use demo mode.
+const isRemote =
+  typeof window !== 'undefined' &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1';
+
+export const HAS_BACKEND = Boolean(import.meta.env.VITE_API_URL) || !isRemote;
+
+// Hard timeout so a missing/slow backend can never hang the UI.
+const REQUEST_TIMEOUT_MS = 4000;
+
+async function request(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const getHeaders = () => {
   const token = localStorage.getItem('token');
   const headers = {};
@@ -12,7 +35,7 @@ const getHeaders = () => {
 export const api = {
   // Auth endpoints
   async register(username, email, password) {
-    const res = await fetch(`${BASE_URL}/auth/register`, {
+    const res = await request(`${BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, email, password }),
@@ -22,7 +45,7 @@ export const api = {
   },
 
   async login(email, password) {
-    const res = await fetch(`${BASE_URL}/auth/login`, {
+    const res = await request(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -34,7 +57,7 @@ export const api = {
   },
 
   async getMe() {
-    const res = await fetch(`${BASE_URL}/auth/me`, {
+    const res = await request(`${BASE_URL}/auth/me`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch user');
@@ -43,7 +66,7 @@ export const api = {
 
   // Project endpoints
   async getProjects() {
-    const res = await fetch(`${BASE_URL}/projects`, {
+    const res = await request(`${BASE_URL}/projects`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch projects');
@@ -51,7 +74,7 @@ export const api = {
   },
 
   async createProject(name, description) {
-    const res = await fetch(`${BASE_URL}/projects`, {
+    const res = await request(`${BASE_URL}/projects`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -64,7 +87,7 @@ export const api = {
   },
 
   async getProject(id) {
-    const res = await fetch(`${BASE_URL}/projects/${id}`, {
+    const res = await request(`${BASE_URL}/projects/${id}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch project details');
@@ -73,7 +96,7 @@ export const api = {
 
   // Chat endpoints
   async getMessages(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/messages`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/messages`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch messages');
@@ -84,7 +107,7 @@ export const api = {
   async uploadDocument(projectId, file) {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/documents`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/documents`, {
       method: 'POST',
       headers: {
         ...getHeaders(),
@@ -96,7 +119,7 @@ export const api = {
   },
 
   async getDocuments(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/documents`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/documents`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch documents');
@@ -105,7 +128,7 @@ export const api = {
 
   // Run pipeline analysis
   async startAnalysis(projectId) {
-    const res = await fetch(`${BASE_URL}/analysis/${projectId}/start`, {
+    const res = await request(`${BASE_URL}/analysis/${projectId}/start`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -115,7 +138,7 @@ export const api = {
 
   // Output fetching
   async getArchitecture(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/architecture`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/architecture`, {
       headers: getHeaders(),
     });
     if (res.status === 404) return null;
@@ -124,7 +147,7 @@ export const api = {
   },
 
   async getDatabaseSchema(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/architecture/database`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/architecture/database`, {
       headers: getHeaders(),
     });
     if (res.status === 404) return null;
@@ -133,7 +156,7 @@ export const api = {
   },
 
   async getApis(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/architecture/apis`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/architecture/apis`, {
       headers: getHeaders(),
     });
     if (res.status === 404) return null;
@@ -142,7 +165,7 @@ export const api = {
   },
 
   async getCloudMapping(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/cloud-mapping`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/cloud-mapping`, {
       headers: getHeaders(),
     });
     if (res.status === 404) return null;
@@ -151,7 +174,7 @@ export const api = {
   },
 
   async getTerraform(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/terraform`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/terraform`, {
       headers: getHeaders(),
     });
     if (res.status === 404) return null;
@@ -160,7 +183,7 @@ export const api = {
   },
 
   async getReviews(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/reviews`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/reviews`, {
       headers: getHeaders(),
     });
     if (res.status === 404) return null;
@@ -169,7 +192,7 @@ export const api = {
   },
 
   async getDocumentation(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/documentation`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/documentation`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch documentation');
@@ -177,7 +200,7 @@ export const api = {
   },
 
   async saveDocumentation(projectId, markdown) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/documentation`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/documentation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -190,7 +213,7 @@ export const api = {
   },
 
   async saveArchitecture(projectId, architectureData, terraformCode) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/architecture`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/architecture`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -203,7 +226,7 @@ export const api = {
   },
 
   async getVersions(projectId) {
-    const res = await fetch(`${BASE_URL}/projects/${projectId}/versions`, {
+    const res = await request(`${BASE_URL}/projects/${projectId}/versions`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch project versions');

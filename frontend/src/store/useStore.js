@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api } from '../components/api';
+import { api, HAS_BACKEND } from '../components/api';
 
 const MOCK_DATA = {
   requirement: {
@@ -411,6 +411,23 @@ Overall architecture quality score: **96/100** ✅`,
     // Developer Auto-Login with transparent Demo fallbacks
     autoLogin: async () => {
       set({ isAuthenticating: true, authError: null });
+
+      // No backend reachable (static deployment) -> launch demo mode immediately.
+      if (!HAS_BACKEND) {
+        const demoUser = { id: 'demo-user', username: 'developer_demo', email: 'demo@nextgenads.ai', role: 'user' };
+        const demoProject = { id: 'demo-project-id', name: 'Demo CloudStore Portal', description: 'Pre-loaded demo architecture environment' };
+        set({
+          user: demoUser,
+          isDemoMode: true,
+          isAuthenticating: false,
+          projects: [demoProject],
+          currentProject: demoProject
+        });
+        await get().fetchGeneratedData('demo-project-id');
+        get().addLog({ level: 'info', message: 'Workspace running in Local Interactive Demo Mode.' });
+        return;
+      }
+
       try {
         // Try logging in with standard developer account
         await api.login('dev_client@nextgenads.ai', 'password123');
@@ -437,6 +454,7 @@ Overall architecture quality score: **96/100** ✅`,
             projects: [demoProject],
             currentProject: demoProject
           });
+          await get().fetchGeneratedData('demo-project-id');
           get().addLog({ level: 'info', message: 'Workspace running in Local Interactive Demo Mode.' });
         }
       }
