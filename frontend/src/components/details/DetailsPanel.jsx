@@ -21,7 +21,7 @@ export default function DetailsPanel() {
     setIsExplaining(true);
     setExplanation('');
     try {
-      const res = await fetch(`${BASE_URL}/chat/${currentProject.id}`, {
+      const res = await fetch(`${BASE_URL}/chat/${currentProject.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message: `Explain the architecture component: ${selectedNode.data.name || selectedNode.id}` })

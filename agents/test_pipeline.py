@@ -1,6 +1,7 @@
 # agents/test_pipeline.py
 
 import os
+import pytest
 from src.common.context import AgentContext
 from src.document_processing.document_agent import DocumentProcessingAgent
 from src.requirement.requirement_agent import RequirementAgent
@@ -26,6 +27,8 @@ def test():
     # 1. Verify key configuration is present
     api_key = os.getenv("GROQ_API_KEYS") or os.getenv("GEMINI_API_KEYS")
     print(f"[Test] Env Key Configuration Found: {api_key is not None}")
+    if not api_key:
+        pytest.skip("Full pipeline test requires GROQ_API_KEYS or GEMINI_API_KEYS")
 
     # 2. Initialize a context workspace with unstructured text
     dummy_text = (

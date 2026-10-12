@@ -443,19 +443,15 @@ Overall architecture quality score: **96/100** ✅`,
           set({ user: userRes.user, token: localStorage.getItem('token'), isAuthenticating: false, isDemoMode: false });
           await get().fetchProjects();
         } catch (regErr) {
-          console.warn("Backend auth failed. Launching in Interactive Demo Mode.");
-          // Safe fallback so the UI is fully functional and interactive
-          const demoUser = { id: 'demo-user', username: 'developer_demo', email: 'demo@nextgenads.ai', role: 'user' };
-          const demoProject = { id: 'demo-project-id', name: 'Demo CloudStore Portal', description: 'Pre-loaded demo architecture environment' };
+          console.error("Backend authentication failed", regErr);
+          localStorage.removeItem('token');
           set({
-            user: demoUser,
-            isDemoMode: true,
+            token: null,
+            user: null,
+            isDemoMode: false,
             isAuthenticating: false,
-            projects: [demoProject],
-            currentProject: demoProject
+            authError: 'The backend is unavailable. Check the API service and retry.'
           });
-          await get().fetchGeneratedData('demo-project-id');
-          get().addLog({ level: 'info', message: 'Workspace running in Local Interactive Demo Mode.' });
         }
       }
     },

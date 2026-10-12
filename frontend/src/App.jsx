@@ -12,6 +12,7 @@ import './App.css';
 export default function App() {
   const autoLogin = useStore((s) => s.autoLogin);
   const isAuthenticating = useStore((s) => s.isAuthenticating);
+  const authError = useStore((s) => s.authError);
   const currentTab = useStore((s) => s.currentTab);
   const canvasViewMode = useStore((s) => s.canvasViewMode);
 
@@ -25,6 +26,18 @@ export default function App() {
         <div className="loading-capsule">
           <span className="loading-dot-pulse" />
           <span>Authenticating Developer Mode...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="loading-capsule auth-error-card">
+          <strong>Unable to connect to the architecture backend</strong>
+          <span>{authError}</span>
+          <button type="button" onClick={autoLogin}>Retry connection</button>
         </div>
       </div>
     );
