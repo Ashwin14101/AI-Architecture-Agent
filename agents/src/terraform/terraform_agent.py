@@ -45,16 +45,24 @@ class TerraformAgent(BaseAgent):
         )
 
         try:
-            # Call the LLM in JSON mode
+            # The selected Groq reasoning model can reject response_format when the
+            # generated Terraform is large. Request plain text and parse the JSON
+            # envelope ourselves so long Terraform files remain supported.
             json_response = self.llm.call(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                json_mode=True,
+                json_mode=False,
                 temperature=0.1
             )
 
-            # Parse the JSON string
-            data = json.loads(json_response)
+            cleaned_response = json_response.strip()
+            if "```" in cleaned_response:
+                cleaned_response = cleaned_response.replace("```json", "").replace("```", "").strip()
+            start = cleaned_response.find("{")
+            end = cleaned_response.rfind("}")
+            if start < 0 or end <= start:
+                raise ValueError("LLM returned no JSON Terraform envelope")
+            data = json.loads(cleaned_response[start:end + 1])
             files = data.get("files", {})
 
             if not files:
