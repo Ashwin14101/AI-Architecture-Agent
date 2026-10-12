@@ -1,15 +1,16 @@
-export const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/$/, '');
+const isLocalHost = typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const DEFAULT_API_URL = isLocalHost
+  ? 'http://localhost:3000/api'
+  : 'https://ai-architecture-agent-api.onrender.com/api';
+
+export const BASE_URL = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 export const WS_BASE_URL = BASE_URL.replace(/^http/, 'ws');
 
 // Detect whether a real backend is reachable. On a remote static host
 // (e.g. Render) with no VITE_API_URL configured, localhost points at the
 // visitor's own machine, so we must skip network auth and use demo mode.
-const isRemote =
-  typeof window !== 'undefined' &&
-  window.location.hostname !== 'localhost' &&
-  window.location.hostname !== '127.0.0.1';
-
-export const HAS_BACKEND = Boolean(import.meta.env.VITE_API_URL) || !isRemote;
+export const HAS_BACKEND = true;
 
 // Hard timeout so a missing/slow backend can never hang the UI.
 const REQUEST_TIMEOUT_MS = 4000;
