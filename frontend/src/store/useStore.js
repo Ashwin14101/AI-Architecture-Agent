@@ -755,10 +755,16 @@ Overall architecture quality score: **96/100** ✅`,
       }
     },
 
-    // WebSocket pipeline trigger with client-side demo run interval fallback
+    // Start only after the user has uploaded at least one source document.
     startPipeline: async () => {
       const proj = get().currentProject;
       if (!proj) return;
+      if (get().uploadedDocuments.length === 0) {
+        get().addLog({ level: 'warn', message: 'Upload a requirements document before starting the pipeline.' });
+        set({ isDrawerOpen: true });
+        return false;
+      }
+      if (get().pipelineStatus === 'running') return false;
 
       get().resetAllAgentStatuses();
       get().clearLogs();
@@ -825,15 +831,34 @@ Overall architecture quality score: **96/100** ✅`,
         }, 300);
 
 
-        return;
+        return true;
       }
 
       try {
         get().connectSocket(proj.id);
         await api.startAnalysis(proj.id);
+        return true;
       } catch (err) {
         set({ pipelineStatus: 'failed' });
         get().addLog({ level: 'error', message: `Failed to start pipeline: ${err.message}` });
+        return false;
+      }
+    },
+
+    stopPipeline: async () => {
+      const proj = get().currentProject;
+      if (!proj || get().pipelineStatus !== 'running') return;
+      try {
+        if (!get().isDemoMode) await api.cancelAnalysis(proj.id);
+        if (demoInterval) {
+          clearInterval(demoInterval);
+          demoInterval = null;
+        }
+        get().disconnectSocket();
+        set({ pipelineStatus: 'cancelled', currentAgent: null });
+        get().addLog({ level: 'warn', message: 'Pipeline stopped by user.' });
+      } catch (err) {
+        get().addLog({ level: 'error', message: `Could not stop pipeline: ${err.message}` });
       }
     },
 
@@ -913,6 +938,10 @@ Overall architecture quality score: **96/100** ✅`,
                 });
                 return { agentStatuses: updated };
               });
+              socket.close();
+            } else if (status === 'cancelled') {
+              set({ pipelineStatus: 'cancelled', pipelineProgress: 0, currentAgent: null });
+              get().addLog({ level: 'warn', message: message || 'Pipeline cancelled.' });
               socket.close();
             }
           }

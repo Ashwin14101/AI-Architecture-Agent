@@ -471,7 +471,6 @@ function renderMarkdown(content, isStreaming, isLast) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function AiPanel() {
   const currentProject = useStore((s) => s.currentProject);
-  const uploadedDocument = useStore((s) => s.uploadedDocument);
   const uploadedDocuments = useStore((s) => s.uploadedDocuments);
   const activeModel = useStore((s) => s.activeModel);
   const activeAgentFocus = useStore((s) => s.activeAgentFocus);
@@ -479,7 +478,6 @@ export default function AiPanel() {
   const setActiveModel = useStore((s) => s.setActiveModel);
   const startPipeline = useStore((s) => s.startPipeline);
   const pipelineStatus = useStore((s) => s.pipelineStatus);
-  const setCanvasViewMode = useStore((s) => s.setCanvasViewMode);
 
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -534,9 +532,13 @@ export default function AiPanel() {
       return;
     }
     setPipelineCardVisible(true);
+    if (uploadedDocuments.length === 0) {
+      pushAssistantMessage("📄 Upload a requirements document first. I will not start the pipeline without source requirements.");
+      return;
+    }
     startPipeline();
-    pushAssistantMessage("🚀 Got it! I've kicked off the **AI Agent Pipeline**. Watch the live progress below — all 15 agents are running in sequence:");
-  }, [currentProject, startPipeline]);
+    pushAssistantMessage("🚀 The AI Agent Pipeline is starting from your uploaded requirements. Watch the live progress below:");
+  }, [currentProject, startPipeline, uploadedDocuments.length]);
 
   const sendMessage = async (text, e) => {
     if (e) e.preventDefault();
@@ -564,63 +566,18 @@ export default function AiPanel() {
       } catch (err) {
         console.error(err);
       }
-      setTimeout(() => {
-        triggerPipeline();
-      }, 500);
+      pushAssistantMessage("📄 Document uploaded successfully. Review it in the sidebar, then click **Run Full Pipeline** when you are ready.");
       return;
     }
 
     // ── Intent detection ────────────────────────────────────────────
     const intent = detectIntent(msgText);
 
-    if (intent.type === 'greeting') {
-      setTimeout(() => pushAssistantMessage(randomFrom(CONVERSATIONAL_RESPONSES.greeting)), 400);
-      return;
-    }
-
-    if (intent.type === 'thanks') {
-      setTimeout(() => pushAssistantMessage(randomFrom(CONVERSATIONAL_RESPONSES.thanks)), 300);
-      return;
-    }
-
-    if (intent.type === 'qa') {
-      // Stream in the answer word by word for a natural feel
-      const words = intent.answer.split(' ');
-      let built = '';
-      setIsStreaming(true);
-      setMessages((prev) => [...prev, { sender: 'assistant', content: '' }]);
-      let i = 0;
-      const iv = setInterval(() => {
-        if (i < words.length) {
-          built += (i === 0 ? '' : ' ') + words[i++];
-          setMessages((prev) => {
-            const u = [...prev];
-            u[u.length - 1] = { sender: 'assistant', content: built };
-            return u;
-          });
-        } else {
-          clearInterval(iv);
-          setIsStreaming(false);
-        }
-      }, 28);
-      return;
-    }
-
     if (intent.type === 'work') {
       setTimeout(() => triggerPipeline(), 300);
       return;
     }
 
-
-    // ── Rename local command ─────────────────────────────────────────
-    const renameMatch = messageContent.match(/rename\s+table\s+(\w+)\s+to\s+(\w+)/i);
-    if (renameMatch) {
-      setTimeout(() => {
-        useStore.getState().updateGeneratedNode?.('database', renameMatch[1], renameMatch[2]);
-        pushAssistantMessage(`✅ Done! I've renamed the database table **"${renameMatch[1]}"** → **"${renameMatch[2]}"** in the schema diagram.\n\nSwitch to the **DB Schema** view on the canvas to see the change.`);
-      }, 600);
-      return;
-    }
 
     // ── Real backend chat ────────────────────────────────────────────
     if (!projectId) {
@@ -677,7 +634,7 @@ export default function AiPanel() {
         const u = [...prev];
         u[u.length - 1] = {
           sender: 'assistant',
-          content: "⚠️ Couldn't reach the AI backend right now.\n\nMake sure the backend server is running:\n```\ncd backend && python3 run.py\n```\n\nOr ask me about the pipeline, agents, or architecture — I can answer those locally! 🤖",
+          content: `⚠️ The AI provider did not return a response. ${err.message || 'Check the configured provider API key in Render.'}`,
         };
         return u;
       });

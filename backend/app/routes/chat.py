@@ -12,6 +12,16 @@ from app.middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
+@router.get("/provider-status")
+async def provider_status(current_user: User = Depends(get_current_user)):
+    provider = os.getenv("LLM_PROVIDER", "groq").lower()
+    key_name = "GROQ_API_KEYS" if provider == "groq" else "GEMINI_API_KEYS"
+    return {
+        "provider": provider,
+        "configured": bool(os.getenv(key_name, "").split(",")[0].strip()),
+        "model": os.getenv("GROQ_MODEL" if provider == "groq" else "GEMINI_MODEL", ""),
+    }
+
 # ── LLM Client (Groq first, Gemini fallback) ──────────────────────────────
 def _make_client(provider: str):
     key = (os.getenv("GROQ_API_KEYS", "") if provider == "groq" else os.getenv("GEMINI_API_KEYS", "")).split(",")[0].strip()

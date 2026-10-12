@@ -2,7 +2,7 @@ const isLocalHost = typeof window !== 'undefined' &&
   ['localhost', '127.0.0.1'].includes(window.location.hostname);
 const DEFAULT_API_URL = isLocalHost
   ? 'http://localhost:3000/api'
-  : 'https://ai-architecture-agent-api.onrender.com/api';
+  : 'https://ai-architecture-agent-api-live.onrender.com/api';
 
 export const BASE_URL = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 export const WS_BASE_URL = BASE_URL.replace(/^http/, 'ws');
@@ -135,6 +135,15 @@ export const api = {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to start analysis');
+    return res.json();
+  },
+
+  async cancelAnalysis(projectId) {
+    const res = await request(`${BASE_URL}/analysis/${projectId}/cancel`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to cancel analysis');
     return res.json();
   },
 

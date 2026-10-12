@@ -44,6 +44,7 @@ from agents.src.versioning.versioning_agent import VersioningAgent
 from agents.src.deployment.deployment_agent import DeploymentAgent
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
+cancelled_projects = set()
 
 async def run_pipeline_task(project_id: str, db_session_factory):
     # Retrieve a fresh DB session for the background thread
@@ -92,6 +93,13 @@ async def run_pipeline_task(project_id: str, db_session_factory):
             
             # 4. Run agents sequentially
             for idx, (name, agent) in enumerate(pipeline, 1):
+                if project_id in cancelled_projects:
+                    cancelled_projects.discard(project_id)
+                    await manager.broadcast(project_id, {
+                        "type": "analysis_update",
+                        "data": {"status": "cancelled", "progress": 0, "message": "Pipeline cancelled by user."}
+                    })
+                    return
                 progress = int((idx / total_steps) * 100)
                 await manager.broadcast(project_id, {
                     "type": "analysis_update",
@@ -248,6 +256,18 @@ async def start_analysis(projectId: str, background_tasks: BackgroundTasks, curr
     background_tasks.add_task(run_pipeline_task, projectId, SessionLocal)
     
     return {"status": "success", "message": "Analysis started"}
+
+@router.post("/{projectId}/cancel")
+async def cancel_analysis(projectId: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Project).filter(Project.id == projectId, Project.ownerId == current_user.id))
+    if not result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
+    cancelled_projects.add(projectId)
+    await manager.broadcast(projectId, {
+        "type": "analysis_update",
+        "data": {"status": "cancelled", "progress": 0, "message": "Pipeline cancellation requested."}
+    })
+    return {"status": "cancel_requested"}
 
 @router.post("/{projectId}/scan")
 async def run_security_scan(projectId: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

@@ -13,7 +13,7 @@ export default function PipelineDrawer() {
   const clearLogs = useStore((s) => s.clearLogs);
   const qualityScore = useStore((s) => s.qualityScore);
   const startPipeline = useStore((s) => s.startPipeline);
-  const disconnectSocket = useStore((s) => s.disconnectSocket);
+  const stopPipeline = useStore((s) => s.stopPipeline);
 
   const logEndRef = useRef(null);
 
@@ -23,13 +23,6 @@ export default function PipelineDrawer() {
     }
   }, [logs]);
 
-  // Clean up WebSocket connection when component unmounts
-  useEffect(() => {
-    return () => {
-      disconnectSocket();
-    };
-  }, [disconnectSocket]);
-
   const isRunning = pipelineStatus === 'running';
 
   const handleRunPipeline = () => {
@@ -37,9 +30,7 @@ export default function PipelineDrawer() {
   };
 
   const handleStopPipeline = () => {
-    disconnectSocket();
-    useStore.getState().setPipelineStatus('idle');
-    useStore.getState().addLog({ level: 'warn', message: 'Pipeline stopped by user.' });
+    stopPipeline();
   };
 
   return (

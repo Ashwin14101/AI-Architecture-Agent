@@ -27,4 +27,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://ai-architecture-agent-api.onrender.com/api
+        value: https://ai-architecture-agent-api-live.onrender.com/api
