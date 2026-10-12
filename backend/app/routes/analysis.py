@@ -251,6 +251,12 @@ async def start_analysis(projectId: str, background_tasks: BackgroundTasks, curr
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    document_result = await db.execute(
+        select(Document).filter(Document.projectId == projectId).limit(1)
+    )
+    if not document_result.scalars().first():
+        raise HTTPException(status_code=400, detail="Upload a requirements document before starting the pipeline")
+
     # Get the raw session maker from the database binding to pass to the background thread
     from app.database import SessionLocal
     background_tasks.add_task(run_pipeline_task, projectId, SessionLocal)
