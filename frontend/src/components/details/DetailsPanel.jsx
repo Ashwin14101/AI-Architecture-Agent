@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../api';
-import { X, Sparkles, Database, Network, Globe, DollarSign, Shield, Zap, MousePointer } from 'lucide-react';
+import { X, Sparkles, Database, DollarSign, Shield, Zap } from 'lucide-react';
 import useStore from '../../store/useStore';
 import './DetailsPanel.css';
 
@@ -52,15 +52,7 @@ export default function DetailsPanel() {
   };
 
   if (!selectedNode) {
-    return (
-      <div className="details-panel empty">
-        <div className="dp-empty-content">
-          <MousePointer size={32} />
-          <h3>No Component Selected</h3>
-          <p>Click any node to inspect it</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const { data, type } = selectedNode;
