@@ -104,7 +104,7 @@ async def run_pipeline_task(project_id: str, db_session_factory):
                 })
 
                 # Execute Agent
-                context = agent.run(context)
+                context = await asyncio.to_thread(agent.run, context)
 
                 # Log Agent execution in DB
                 exec_log = AgentExecution(

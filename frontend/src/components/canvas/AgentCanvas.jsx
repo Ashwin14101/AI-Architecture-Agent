@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
+import { BASE_URL } from '../api';
 import {
   ReactFlow,
   Background,
@@ -844,7 +845,7 @@ function AgentCanvasInner() {
       const token = localStorage.getItem('token');
       const pid = currentProject?.id;
       if (!pid) { setAskAiResponse('Select a project first.'); setAskAiProcessing(false); return; }
-      const res = await fetch(`http://localhost:3000/api/chat/${pid}/messages`, {
+      const res = await fetch(`${BASE_URL}/chat/${pid}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
         body: JSON.stringify({ content: `[Canvas AI] ${input}` }),

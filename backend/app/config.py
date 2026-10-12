@@ -12,9 +12,14 @@ class Settings:
     REFRESH_TOKEN_EXPIRY_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRY_DAYS", "7"))
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", FRONTEND_URL)
+    MAX_UPLOAD_BYTES: int = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+    ALLOWED_UPLOAD_EXTENSIONS: tuple = (".txt", ".md", ".markdown", ".pdf", ".docx")
 
     def __init__(self):
         # Validate critical security configurations on startup
+        if self.JWT_SECRET == "supersecretkey123" and os.getenv("ENVIRONMENT", "development") == "production":
+            raise RuntimeError("JWT_SECRET must be configured in production")
         if self.JWT_SECRET == "supersecretkey123":
             print("\n" + "="*80)
             print(" SECURITY WARNING: 'JWT_SECRET' is set to default 'supersecretkey123'!")
@@ -25,7 +30,9 @@ class Settings:
     def get_db_url(self) -> str:
         if self.DATABASE_URL:
             url = self.DATABASE_URL
-            if url.startswith("postgresql://"):
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif url.startswith("postgresql://"):
                 url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
             elif url.startswith("sqlite://"):
                 url = url.replace("sqlite://", "sqlite+aiosqlite://", 1)

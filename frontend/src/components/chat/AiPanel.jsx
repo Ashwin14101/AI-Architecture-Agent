@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import './AiPanel.css';
-import { api } from '../api';
+import { api, BASE_URL } from '../api';
 
 const AVAILABLE_MODELS = [
   'Gemini 3.5 Flash (High)',
@@ -633,7 +633,7 @@ export default function AiPanel() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3000/api/chat/${projectId}/messages`, {
+      const response = await fetch(`${BASE_URL}/chat/${projectId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

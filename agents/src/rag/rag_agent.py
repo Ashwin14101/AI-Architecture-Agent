@@ -1,7 +1,11 @@
 # agents/src/rag/rag_agent.py
 import os
-from pinecone import Pinecone
-from sentence_transformers import SentenceTransformer
+try:
+    from pinecone import Pinecone
+    from sentence_transformers import SentenceTransformer
+except ImportError:  # Optional integrations are not needed for the local/demo pipeline.
+    Pinecone = None
+    SentenceTransformer = None
 from src.common.base_agent import BaseAgent
 from src.common.context import AgentContext
 
@@ -13,8 +17,11 @@ class RagAgent(BaseAgent):
         self.api_key = os.getenv("PINECONE_API_KEY")
         self.index_name = os.getenv("PINECONE_INDEX_NAME", "architecture-standards")
         
-        if not self.api_key:
-            raise ValueError("PINECONE_API_KEY is not set in environment variables.")
+        if not self.api_key or Pinecone is None or SentenceTransformer is None:
+            self.pc = None
+            self.index = None
+            self.model = None
+            return
 
         # Initialize Pinecone Client
         self.pc = Pinecone(api_key=self.api_key)
@@ -26,6 +33,11 @@ class RagAgent(BaseAgent):
 
     def run(self, context: AgentContext) -> AgentContext:
         self.log_start(context, "Querying Pinecone vector database for matching standards...")
+
+        if self.index is None:
+            context.retrieved_knowledge = []
+            self.log_success(context, "RAG skipped: Pinecone integration is not configured.")
+            return context
 
         retrieved_standards = []
 

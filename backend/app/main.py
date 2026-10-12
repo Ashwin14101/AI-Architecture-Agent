@@ -3,13 +3,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth, project, analysis, cloud, chat, observability
 from app.database import engine, Base
+from app.config import settings
 
 app = FastAPI(title="AI Architecture Agent API", version="1.0.0")
 
 # Setup CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,3 +32,13 @@ app.include_router(observability.router, prefix="/api")
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+@app.get("/health/live")
+async def liveness_check():
+    return {"status": "ok"}
+
+@app.get("/health/ready")
+async def readiness_check():
+    async with engine.connect() as connection:
+        await connection.exec_driver_sql("SELECT 1")
+    return {"status": "ready"}

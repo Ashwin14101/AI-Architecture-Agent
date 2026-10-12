@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/$/, '');
+export const WS_BASE_URL = BASE_URL.replace(/^http/, 'ws');
 
 // Detect whether a real backend is reachable. On a remote static host
 // (e.g. Render) with no VITE_API_URL configured, localhost points at the

@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, File, UploadFile
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
-from app.models import Project, Deployment, User, Document, ArchitectureVersion, Review, ReviewFinding, Requirement
+from app.models import Project, Deployment, User, Document, ArchitectureVersion, Review, ReviewFinding, Requirement, generate_uuid
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectsListResponse, DeploymentCreate, FindingUpdate
 from app.middleware.auth_middleware import get_current_user
 from app.middleware.rbac_middleware import require_role
@@ -24,6 +25,16 @@ async def extract_text_from_file(file_path: str) -> str:
             return f.read()
     except Exception as e:
         return f"Error reading document text: {str(e)}"
+
+async def get_owned_project(project_id: str, current_user: User, db: AsyncSession) -> Project:
+    result = await db.execute(select(Project).where(
+        Project.id == project_id,
+        Project.ownerId == current_user.id,
+    ))
+    project = result.scalars().first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
 
 
 @router.get("", response_model=ProjectsListResponse)
@@ -83,21 +94,30 @@ async def delete_project(id: str, current_user: User = Depends(require_role("adm
 @router.post("/{id}/documents", status_code=201)
 async def upload_document(id: str, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     # Verify project ownership
-    result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
-    project = result.scalars().first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await get_owned_project(id, current_user, db)
+    original_name = os.path.basename(file.filename or "upload.txt")
+    extension = os.path.splitext(original_name)[1].lower()
+    if extension not in settings.ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=415, detail="Unsupported file type")
     # Save uploaded file
-    file_path = os.path.join(settings.UPLOAD_DIR, f"{id}_{file.filename}")
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", original_name)
+    file_path = os.path.join(settings.UPLOAD_DIR, f"{id}_{generate_uuid()}_{safe_name}")
+    total_size = 0
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        while chunk := await file.read(1024 * 1024):
+            total_size += len(chunk)
+            if total_size > settings.MAX_UPLOAD_BYTES:
+                buffer.close()
+                os.remove(file_path)
+                raise HTTPException(status_code=413, detail="Uploaded file is too large")
+            buffer.write(chunk)
     # Get file stats
     file_size = os.path.getsize(file_path)
     extracted_text = await extract_text_from_file(file_path)
     # Save to database
     new_doc = Document(
         projectId=id,
-        name=file.filename,
+        name=original_name,
         filePath=file_path,
         fileSize=file_size,
         extractedText=extracted_text
@@ -135,6 +155,7 @@ async def get_project_documents(id: str, current_user: User = Depends(get_curren
 # --- RETRIEVE AGENT OUTPUTS ---
 @router.get("/{id}/architecture")
 async def get_logical_architecture(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await get_owned_project(id, current_user, db)
     result = await db.execute(
         select(ArchitectureVersion)
         .filter(ArchitectureVersion.projectId == id)
@@ -147,6 +168,7 @@ async def get_logical_architecture(id: str, current_user: User = Depends(get_cur
     return latest_version.architectureData.get("components", [])
 @router.get("/{id}/architecture/database")
 async def get_database_schema(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await get_owned_project(id, current_user, db)
     # Pull latest version and extract database schemas
     result = await db.execute(
         select(ArchitectureVersion)
@@ -161,6 +183,7 @@ async def get_database_schema(id: str, current_user: User = Depends(get_current_
     return latest_version.architectureData.get("database_schema", [])
 @router.get("/{id}/architecture/apis")
 async def get_api_specifications(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await get_owned_project(id, current_user, db)
     result = await db.execute(
         select(ArchitectureVersion)
         .filter(ArchitectureVersion.projectId == id)
@@ -173,6 +196,7 @@ async def get_api_specifications(id: str, current_user: User = Depends(get_curre
     return latest_version.architectureData.get("apis", [])
 @router.get("/{id}/cloud-mapping")
 async def get_cloud_mappings(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await get_owned_project(id, current_user, db)
     result = await db.execute(
         select(ArchitectureVersion)
         .filter(ArchitectureVersion.projectId == id)
@@ -188,6 +212,7 @@ async def get_cloud_mappings(id: str, current_user: User = Depends(get_current_u
     }
 @router.get("/{id}/terraform")
 async def get_terraform_code(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await get_owned_project(id, current_user, db)
     result = await db.execute(
         select(ArchitectureVersion)
         .filter(ArchitectureVersion.projectId == id)
@@ -203,6 +228,7 @@ async def get_terraform_code(id: str, current_user: User = Depends(get_current_u
     }
 @router.get("/{id}/reviews")
 async def get_reviews_findings(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await get_owned_project(id, current_user, db)
     # Fetch latest review scoring
     review_res = await db.execute(
         select(Review)
@@ -225,6 +251,7 @@ async def get_reviews_findings(id: str, current_user: User = Depends(get_current
     }
 @router.get("/{id}/versions")
 async def get_all_versions(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await get_owned_project(id, current_user, db)
     result = await db.execute(
         select(ArchitectureVersion)
         .filter(ArchitectureVersion.projectId == id)
@@ -274,37 +301,15 @@ class ArchitectureUpdatePayload(BaseModel):
 
 @router.get("/{id}/documentation")
 async def get_project_documentation(id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
-    project = result.scalars().first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    docs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../docs/architecture_docs.md"))
-    if not os.path.exists(docs_path):
-        return {"markdown": "# Executive Architecture Specifications\n\nNo documentation compiled yet. Start the pipeline to generate it!"}
-    
-    try:
-        with open(docs_path, "r", encoding="utf-8") as f:
-            return {"markdown": f.read()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read documentation: {str(e)}")
+    project = await get_owned_project(id, current_user, db)
+    return {"markdown": (project.settings or {}).get("documentation", "# Executive Architecture Specifications\n\nNo documentation compiled yet. Start the pipeline to generate it!")}
 
 @router.post("/{id}/documentation")
 async def update_project_documentation(id: str, payload: DocumentationUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Project).filter(Project.id == id, Project.ownerId == current_user.id))
-    project = result.scalars().first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    docs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../docs/architecture_docs.md"))
-    os.makedirs(os.path.dirname(docs_path), exist_ok=True)
-    
-    try:
-        with open(docs_path, "w", encoding="utf-8") as f:
-            f.write(payload.markdown)
-        return {"status": "success", "message": "Documentation saved successfully!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to write documentation: {str(e)}")
+    project = await get_owned_project(id, current_user, db)
+    project.settings = {**(project.settings or {}), "documentation": payload.markdown}
+    await db.commit()
+    return {"status": "success", "message": "Documentation saved successfully!"}
 
 @router.put("/{id}/architecture")
 async def update_project_architecture(id: str, payload: ArchitectureUpdatePayload, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

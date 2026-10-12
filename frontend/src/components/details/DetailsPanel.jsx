@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BASE_URL } from '../api';
 import { X, Sparkles, Database, Network, Globe, DollarSign, Shield, Zap, MousePointer } from 'lucide-react';
 import useStore from '../../store/useStore';
 import './DetailsPanel.css';
@@ -20,7 +21,7 @@ export default function DetailsPanel() {
     setIsExplaining(true);
     setExplanation('');
     try {
-      const res = await fetch(`http://localhost:3000/api/chat/${currentProject.id}`, {
+      const res = await fetch(`${BASE_URL}/chat/${currentProject.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message: `Explain the architecture component: ${selectedNode.data.name || selectedNode.id}` })

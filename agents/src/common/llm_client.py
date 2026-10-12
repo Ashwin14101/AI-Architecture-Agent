@@ -1,7 +1,12 @@
 # agents/src/common/llm_client.py
 
 import os
-from openai import OpenAI, RateLimitError
+try:
+    from openai import OpenAI, RateLimitError
+except ImportError:  # The API can boot without an LLM provider configured.
+    OpenAI = None
+    class RateLimitError(Exception):
+        pass
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -34,6 +39,9 @@ class LlmClient:
             raise ValueError(f"No API Keys found for provider '{self.provider}'. Set {self.provider.upper()}_API_KEYS.")
 
     def _init_client(self):
+        if OpenAI is None:
+            self.client = None
+            return
         current_key = self.api_keys[self.current_key_index]
         masked_key = f"{current_key[:6]}...{current_key[-4:]}" if len(current_key) > 10 else "invalid_key"
 
@@ -44,7 +52,9 @@ class LlmClient:
 
         self.client = OpenAI(
             api_key=current_key,
-            base_url=self.base_url
+            base_url=self.base_url,
+            timeout=60.0,
+            max_retries=1,
         )
         
     def _rotate_key(self) -> bool:
@@ -73,7 +83,14 @@ class LlmClient:
         """
         Runs completions and returns tuple: (content_str, usage_dict, model_name).
         """
+        if self.client is None:
+            raise RuntimeError("The optional openai package is not installed.")
+        attempted_keys = set()
         while True:
+            identity = (self.provider, self.current_key_index)
+            if identity in attempted_keys:
+                raise RuntimeError("All configured LLM credentials are rate limited. Retry later.")
+            attempted_keys.add(identity)
             try:
                 response_format = {"type": "json_object"} if json_mode else None
                 completion = self.client.chat.completions.create(

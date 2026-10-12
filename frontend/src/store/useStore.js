@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, HAS_BACKEND } from '../components/api';
+import { api, BASE_URL, HAS_BACKEND, WS_BASE_URL } from '../components/api';
 
 const MOCK_DATA = {
   requirement: {
@@ -66,7 +66,7 @@ resource "aws_db_instance" "postgres" {
   instance_class       = "db.t3.micro"
   db_name              = "cloudstore"
   username             = "dbadmin"
-  password             = "supersecure123"
+   password             = var.db_password
   skip_final_snapshot  = true
 }`
   },
@@ -105,7 +105,7 @@ const useStore = create((set, get) => {
     fetchCostData: async (projectId) => {
       try {
         const token = get().token;
-        const res = await fetch(`http://localhost:3000/api/analysis/${projectId}/cost`, {
+        const res = await fetch(`${BASE_URL}/analysis/${projectId}/cost`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
@@ -117,7 +117,7 @@ const useStore = create((set, get) => {
     fetchScanResults: async (projectId) => {
       try {
         const token = get().token;
-        const res = await fetch(`http://localhost:3000/api/analysis/${projectId}/scan-results`, {
+        const res = await fetch(`${BASE_URL}/analysis/${projectId}/scan-results`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
@@ -129,7 +129,7 @@ const useStore = create((set, get) => {
     runSecurityScan: async (projectId) => {
       try {
         const token = get().token;
-        const res = await fetch(`http://localhost:3000/api/analysis/${projectId}/scan`, {
+        const res = await fetch(`${BASE_URL}/analysis/${projectId}/scan`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
@@ -143,7 +143,7 @@ const useStore = create((set, get) => {
     fetchDiff: async (projectId, v1, v2) => {
       try {
         const token = get().token;
-        const res = await fetch(`http://localhost:3000/api/projects/${projectId}/compare?v1=${v1}&v2=${v2}`, {
+        const res = await fetch(`${BASE_URL}/projects/${projectId}/compare?v1=${v1}&v2=${v2}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) return await res.json();
@@ -846,7 +846,7 @@ Overall architecture quality score: **96/100** ✅`,
         socket.close();
       }
 
-      socket = new WebSocket(`ws://localhost:3000/api/projects/${projectId}/ws`);
+      socket = new WebSocket(`${WS_BASE_URL}/projects/${projectId}/ws`);
 
       socket.onopen = () => {
         get().addLog({ level: 'info', message: 'WebSocket tunnel connected.' });

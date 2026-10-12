@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -14,15 +14,22 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 # ── LLM Client (Groq first, Gemini fallback) ──────────────────────────────
 def _make_client(provider: str):
+    key = (os.getenv("GROQ_API_KEYS", "") if provider == "groq" else os.getenv("GEMINI_API_KEYS", "")).split(",")[0].strip()
+    if not key:
+        raise RuntimeError(f"{provider.upper()} API key is not configured")
     if provider == "groq":
         return AsyncOpenAI(
-            api_key=os.getenv("GROQ_API_KEYS", "").split(",")[0].strip(),
+            api_key=key,
             base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
+            timeout=60,
+            max_retries=1,
         ), os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     else:
         return AsyncOpenAI(
-            api_key=os.getenv("GEMINI_API_KEYS", "").split(",")[0].strip(),
+            api_key=key,
             base_url=os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai"),
+            timeout=60,
+            max_retries=1,
         ), os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Load .env from agents directory
@@ -43,7 +50,11 @@ Follow these strict rules:
 async def stream_ai_response(user_message: str, context: str = ""):
     """Stream a real AI response using Groq or Gemini."""
     provider = os.getenv("LLM_PROVIDER", "groq")
-    client, model = _make_client(provider)
+    try:
+        client, model = _make_client(provider)
+    except RuntimeError as error:
+        yield f"data: ⚠️ {error}\n\n"
+        return
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if context:
@@ -94,6 +105,12 @@ async def send_message(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    project_result = await db.execute(select(Project).where(
+        Project.id == projectId,
+        Project.ownerId == current_user.id,
+    ))
+    if not project_result.scalars().first():
+        raise HTTPException(status_code=404, detail="Project not found")
     # Build context from the project's latest architecture version
     context_parts = []
     try:
