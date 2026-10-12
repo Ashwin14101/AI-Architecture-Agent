@@ -27,7 +27,9 @@ class LlmClient:
             keys = os.getenv("GEMINI_API_KEYS")
         else: # default is groq
             self.base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-            self.model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            self.model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+            if self.model == "llama-3.3-70b-versatile":
+                self.model = "openai/gpt-oss-120b"
             keys = os.getenv("GROQ_API_KEYS")
 
         if keys:

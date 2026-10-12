@@ -16,10 +16,13 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 async def provider_status(current_user: User = Depends(get_current_user)):
     provider = os.getenv("LLM_PROVIDER", "groq").lower()
     key_name = "GROQ_API_KEYS" if provider == "groq" else "GEMINI_API_KEYS"
+    model = os.getenv("GROQ_MODEL" if provider == "groq" else "GEMINI_MODEL", "")
+    if provider == "groq" and model == "llama-3.3-70b-versatile":
+        model = "openai/gpt-oss-120b"
     return {
         "provider": provider,
         "configured": bool(os.getenv(key_name, "").split(",")[0].strip()),
-        "model": os.getenv("GROQ_MODEL" if provider == "groq" else "GEMINI_MODEL", ""),
+        "model": model,
     }
 
 # ── LLM Client (Groq first, Gemini fallback) ──────────────────────────────
@@ -28,12 +31,15 @@ def _make_client(provider: str):
     if not key:
         raise RuntimeError(f"{provider.upper()} API key is not configured")
     if provider == "groq":
+        configured_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+        if configured_model == "llama-3.3-70b-versatile":
+            configured_model = "openai/gpt-oss-120b"
         return AsyncOpenAI(
             api_key=key,
             base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
             timeout=60,
             max_retries=1,
-        ), os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        ), configured_model
     else:
         return AsyncOpenAI(
             api_key=key,
